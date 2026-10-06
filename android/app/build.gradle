@@ -93,6 +93,14 @@ android {
             keyPassword 'android'
         }
     }
+    splits {
+        abi {
+            reset()
+            enable true
+            universalApk false
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
+    }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -102,6 +110,7 @@ android {
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
@@ -117,3 +126,10 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Copia as fontes do react-native-vector-icons (node_modules/react-native-vector-icons/Fonts)
+// para os assets do app — sem isso os ícones ficam "quebrados" (caixas vazias) em runtime.
+project.ext.vectoricons = [
+    iconFontNames: ['MaterialCommunityIcons.ttf']
+]
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
