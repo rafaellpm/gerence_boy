@@ -39,6 +39,11 @@ export function IdentificarEntregadorScreen({ navigation }: Props) {
 
       selecionarEntregador(entregador, permanecerLogado);
       navigation.replace('MainTabs');
+    } catch (erro) {
+      setFeedback({
+        tipo: 'erro',
+        mensagem: erro instanceof Error ? erro.message : 'Não foi possível consultar o entregador.',
+      });
     } finally {
       setCarregando(false);
     }

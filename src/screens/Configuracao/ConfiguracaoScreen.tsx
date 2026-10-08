@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BotaoGrande } from '../../components/BotaoGrande';
 import { HeaderTextButton } from '../../components/HeaderTextButton';
@@ -29,9 +29,9 @@ function alertar(titulo: string, mensagem: string): Promise<void> {
  * identificação do entregador — nesse caso `navigation.canGoBack()` é `true`
  * e mostramos um botão de cancelar.
  *
- * Ao salvar (ou ao ler o QR Code com o IP do servidor), testa a conexão e
- * registra este aparelho como terminal no servidor (POST /Terminal) — o mesmo
- * vínculo do app GerencePlus, sem senha/código de liberação.
+ * Ao ler o QR Code com o IP do servidor, testa a conexão e registra este
+ * aparelho como terminal no servidor (POST /Terminal) — o mesmo vínculo do
+ * app GerencePlus, sem senha/código de liberação.
  */
 export function ConfiguracaoScreen({ navigation }: Props) {
   const [ip, setIp] = useState('');
@@ -120,9 +120,7 @@ export function ConfiguracaoScreen({ navigation }: Props) {
 
       <View style={styles.cabecalho}>
         <Text style={styles.titulo}>Configuração do servidor</Text>
-        <Text style={styles.subtitulo}>
-          Leia o QR Code do servidor Gerence Plus ou informe o IP para conectar o app.
-        </Text>
+        <Text style={styles.subtitulo}>Leia o QR Code do servidor Gerence Plus para conectar o app.</Text>
         {cdTerminal ? <Text style={styles.terminal}>Terminal vinculado: {cdTerminal}</Text> : null}
       </View>
 
@@ -131,42 +129,8 @@ export function ConfiguracaoScreen({ navigation }: Props) {
         icone="qrcode-scan"
         variante="secundario"
         onPress={() => setScannerAberto(true)}
-        desabilitado={carregando}
-      />
-
-      <View style={styles.campo}>
-        <Text style={styles.rotulo}>IP do servidor</Text>
-        <TextInput
-          value={ip}
-          onChangeText={setIp}
-          placeholder="Ex.: 192.168.0.10"
-          placeholderTextColor={cores.textoPlaceholder}
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="default"
-          editable={!carregando}
-        />
-      </View>
-
-  {/*     <View style={styles.campo}>
-        <Text style={styles.rotulo}>Porta</Text>
-        <TextInput
-          value={porta}
-          onChangeText={setPorta}
-          placeholder="Ex.: 212"
-          placeholderTextColor={cores.textoPlaceholder}
-          style={styles.input}
-          keyboardType="number-pad"
-          editable={!carregando}
-        />
-      </View> */}
-
-      <BotaoGrande
-        titulo="Salvar"
-        onPress={() => salvar()}
         carregando={carregando}
-        desabilitado={!ip.trim() || !porta.trim()}
+        desabilitado={carregando}
       />
 
       <ScannerCodigoModal visible={scannerAberto} onFechar={() => setScannerAberto(false)} onCodigoLido={aoLerQrCode} />
@@ -205,23 +169,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: cores.sucesso,
-  },
-  campo: {
-    gap: 8,
-  },
-  rotulo: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: cores.texto,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: cores.bordaForte,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: cores.texto,
-    backgroundColor: cores.superficie,
   },
 });

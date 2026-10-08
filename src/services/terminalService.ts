@@ -17,7 +17,7 @@ const LIMITE_NAO_CONFIGURADO = 9998;
  * Exige `configurarApiBaseUrl` já aplicado.
  */
 export async function registrarTerminal(cdTerminalAtual: number): Promise<number> {
-  const modelo = (Platform.OS === 'ios' ? 'iPhone' : DeviceInfo.getModel()).toUpperCase();
+  const modelo = (Platform.OS === 'ios' ? 'iPhone' : DeviceInfo.getDeviceNameSync());
   const serial = (await DeviceInfo.getUniqueId()).toUpperCase();
 
   const resposta = await apiPostTexto('Terminal', {
