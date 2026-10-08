@@ -6,21 +6,52 @@ import { AppHeader } from '../../components/AppHeader';
 import { BotaoGrande } from '../../components/BotaoGrande';
 import { CardEntrega } from '../../components/CardEntrega';
 import { FormaPagamentoModal } from '../../components/FormaPagamentoModal';
+import { HeaderIconButton } from '../../components/HeaderIconButton';
 import { OpcoesEntregaBottomSheet } from '../../components/OpcoesEntregaBottomSheet';
 import { SairHeaderButton } from '../../components/SairHeaderButton';
+import { ScannerCodigoModal } from '../../components/ScannerCodigoModal';
 import { useEntregadorContext } from '../../contexts/EntregadorContext';
 import { MainTabParamList } from '../../navigation/types';
-import { Entrega, FormaPagamento } from '../../services';
+import { entregaService, Entrega, FormaPagamento } from '../../services';
 import { cores } from '../../theme/colors';
 import { abrirEntregaNoGoogleMaps } from '../../utils/maps';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'MinhasEntregas'>;
 
 export function ListaEntregasScreen({ navigation }: Props) {
-  const { entregas, confirmarEntregaLocal, focarEntregaNoMapa } = useEntregadorContext();
+  const { entregas, adicionarEntrega, confirmarEntregaLocal, focarEntregaNoMapa } = useEntregadorContext();
   const [entregaSelecionada, setEntregaSelecionada] = useState<Entrega | null>(null);
   const [entregaParaPagamento, setEntregaParaPagamento] = useState<Entrega | null>(null);
   const [confirmandoPagamento, setConfirmandoPagamento] = useState(false);
+  const [scannerAberto, setScannerAberto] = useState(false);
+  const [bipando, setBipando] = useState(false);
+
+  async function lerCodigoEntrega(codigo: string) {
+    setScannerAberto(false);
+    setBipando(true);
+
+    try {
+      const entrega = await entregaService.buscarPorCodigo(codigo);
+
+      if (!entrega) {
+        Alert.alert('Entrega não encontrada', `Código ${codigo} não encontrado.`);
+        return;
+      }
+
+      const resultado = await adicionarEntrega(entrega);
+
+      if (resultado === 'DUPLICADA') {
+        Alert.alert('Entrega já adicionada', `${entrega.numeroPedido} já está na lista.`);
+        return;
+      }
+
+      Alert.alert('Entrega adicionada', `${entrega.numeroPedido} — ${entrega.cliente}`);
+    } catch (erro) {
+      Alert.alert('Erro ao ler código', erro instanceof Error ? erro.message : String(erro));
+    } finally {
+      setBipando(false);
+    }
+  }
 
   function fecharOpcoes() {
     setEntregaSelecionada(null);
@@ -74,7 +105,12 @@ export function ListaEntregasScreen({ navigation }: Props) {
       <AppHeader
         titulo="Entregas vinculadas"
         subtitulo={`${entregas.length} entrega(s)`}
-        direita={<SairHeaderButton />}
+        direita={
+          <View style={styles.acoesHeader}>
+            <HeaderIconButton icone="camera" onPress={() => setScannerAberto(true)} carregando={bipando} />
+            <SairHeaderButton />
+          </View>
+        }
       />
 
       <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
@@ -112,6 +148,12 @@ export function ListaEntregasScreen({ navigation }: Props) {
           onConfirmar={handleConfirmarPagamento}
           confirmando={confirmandoPagamento}
         />
+
+        <ScannerCodigoModal
+          visible={scannerAberto}
+          onFechar={() => setScannerAberto(false)}
+          onCodigoLido={lerCodigoEntrega}
+        />
       </SafeAreaView>
     </View>
   );
@@ -120,6 +162,11 @@ export function ListaEntregasScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   raiz: {
     flex: 1,
+  },
+  acoesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   container: {
     flex: 1,

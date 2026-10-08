@@ -1,4 +1,4 @@
-import { apiGet, apiPut, CD_EMPRESA, dataDeHojeIso, TP_PEDIDO_ENTREGA } from './api';
+import { api, CD_EMPRESA, dataDeHojeServidor, TP_PEDIDO_ENTREGA } from './api';
 import { Entrega, SituacaoEntrega } from './types';
 
 /**
@@ -57,11 +57,13 @@ function mapearPedido(codigo: string, pedido: PedidoNrApi): Entrega {
  * pedido por número — não existe rota dedicada para entrega/delivery.
  */
 export async function buscarPorCodigo(codigo: string): Promise<Entrega | null> {
-  const pedido = await apiGet<PedidoNrApi>('PedidoNr', {
-    empresa: CD_EMPRESA,
-    data: dataDeHojeIso(),
-    numero: codigo,
-    tipoPedido: TP_PEDIDO_ENTREGA,
+  const { data: pedido } = await api.get<PedidoNrApi>('PedidoNr', {
+    params: {
+      empresa: CD_EMPRESA,
+      data: dataDeHojeServidor(),
+      numero: codigo,
+      tipoPedido: TP_PEDIDO_ENTREGA,
+    },
   });
 
   if (!pedido.NR_PEDIDO) {
@@ -139,9 +141,8 @@ function mapearVenda(venda: VendaEntregadorApi): Entrega {
  * código do entregador).
  */
 export async function buscarVendasDoEntregador(idEntregador: string): Promise<Entrega[]> {
-  const vendas = await apiGet<VendaEntregadorApi[]>(`pedido/entregador/${idEntregador}/pedido`, {
-    empresa: CD_EMPRESA,
-    data: dataDeHojeIso(),
+  const { data: vendas } = await api.get<VendaEntregadorApi[]>(`pedido/entregador/${idEntregador}/pedido`, {
+    params: { empresa: CD_EMPRESA, data: dataDeHojeServidor() },
   });
 
   return vendas.map(mapearVenda);
@@ -157,10 +158,12 @@ export async function vincularEntregador(
   idEntregador: string,
   idPedido: string,
 ): Promise<boolean> {
-  return apiPut(`pedido/entregador/${idEntregador}/pedido/${idPedido}`, {
-    empresa: CD_EMPRESA,
-    data: dataDeHojeIso(),
+  const resposta = await api.put(`pedido/entregador/${idEntregador}/pedido/${idPedido}`, null, {
+    params: { empresa: CD_EMPRESA, data: dataDeHojeServidor() },
+    // A rota devolve "False" + 404 quando o pedido não existe/não está mais em aberto — um "não encontrado" esperado, não erro de transporte.
+    validateStatus: status => (status >= 200 && status < 300) || status === 404,
   });
+  return resposta.data === 'True';
 }
 
 export const entregaService = {

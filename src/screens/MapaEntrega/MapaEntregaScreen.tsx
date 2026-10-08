@@ -189,7 +189,7 @@ export function MapaEntregaScreen(_props: Props) {
 
         <SafeAreaView style={styles.containerVazio} edges={['left', 'right', 'bottom']}>
           <Text style={styles.textoVazio}>
-            Nenhuma entrega para mostrar no mapa. Bipe um pedido na aba Bipagem.
+            Nenhuma entrega para mostrar no mapa. Bipe um pedido na aba Minhas entregas.
           </Text>
         </SafeAreaView>
       </View>

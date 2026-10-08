@@ -6,7 +6,6 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
-  Bipagem: undefined;
   MinhasEntregas: undefined;
   Mapa: undefined;
   Pagamentos: undefined;

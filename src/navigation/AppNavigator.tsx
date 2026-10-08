@@ -13,7 +13,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  * entregador "permanecer logado" já salvo) antes de mostrar qualquer tela.
  * `IdentificarEntregador` funciona como uma tela de "login", fora da barra
  * de abas — só depois de identificar o entregador o app entra em `MainTabs`
- * (bottom tab navigator com Bipagem, Minhas entregas e Mapa).
+ * (bottom tab navigator com Minhas entregas, Mapa e Pagamentos).
  */
 export function AppNavigator() {
   return (

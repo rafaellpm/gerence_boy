@@ -3,7 +3,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback } from 'react';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useEntregadorContext } from '../contexts/EntregadorContext';
-import { BipagemEntregasScreen } from '../screens/BipagemEntregas/BipagemEntregasScreen';
 import { ListaEntregasScreen } from '../screens/ListaEntregas/ListaEntregasScreen';
 import { MapaEntregaScreen } from '../screens/MapaEntrega/MapaEntregaScreen';
 import { PagamentosScreen } from '../screens/Pagamentos/PagamentosScreen';
@@ -14,7 +13,6 @@ import { cores } from '../theme/colors';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const ICONES: Record<keyof MainTabParamList, string> = {
-  Bipagem: 'barcode-scan',
   MinhasEntregas: 'clipboard-list-outline',
   Mapa: 'map-marker-outline',
   Pagamentos: 'cash-multiple',
@@ -50,11 +48,6 @@ export function MainTabNavigator({ navigation }: Props) {
           tabBarStyle: { backgroundColor: cores.tabFundo, borderTopWidth: 0 },
         })}
       >
-        <Tab.Screen
-          name="Bipagem"
-          component={BipagemEntregasScreen}
-          options={{ title: 'Bipagem' }}
-        />
         <Tab.Screen
           name="MinhasEntregas"
           component={ListaEntregasScreen}

@@ -1,26 +1,39 @@
+import axios from 'axios';
+
 /**
- * Configuração base da API do servidorGerencePlus (Delphi + Horse, ver
+ * Instância axios da API do servidorGerencePlus (Delphi + Horse, ver
  * `THorse.Listen` em uPrincipal.pas do projeto servidorGerencePlus).
  *
- * O IP/porta não é mais fixo no código: é definido pelo usuário na
+ * O IP/porta não é fixo no código: é definido pelo usuário na
  * `ConfiguracaoScreen` (persistido via `localDb`) e aplicado aqui em tempo
  * de execução através de `configurarApiBaseUrl`, chamado pela `SplashScreen`
  * assim que a configuração salva é carregada.
+ *
+ * Os serviços (`terminalService`, `entregaService`, `entregadorService`...)
+ * importam `api` e chamam `api.get/post/put` diretamente, passando os
+ * parâmetros do servidor em `params` (as rotas Horse recebem tudo via query
+ * string, sem corpo JSON).
  */
-let apiBaseUrl: string | null = null;
+export const api = axios.create({ timeout: 8000 });
 
 export function configurarApiBaseUrl(ip: string, porta: string): void {
-  apiBaseUrl = `http://${ip}:${porta}`;
+  api.defaults.baseURL = `http://${ip}:${porta}`;
 }
 
-function obterApiBaseUrlObrigatoria(): string {
-  if (!apiBaseUrl) {
-    throw new Error(
-      'URL do servidor não configurada — configure o IP e a porta antes de usar a API.',
-    );
+api.interceptors.response.use(undefined, erro => {
+  if (axios.isAxiosError(erro)) {
+    if (erro.code === 'ECONNABORTED') {
+      erro.message = `Sem resposta do servidor em ${(erro.config?.timeout ?? 0) / 1000}s. Verifique se o aparelho está na mesma rede do servidor e se o ServidorGerencePlus está aberto.`;
+    } else if (!erro.response) {
+      erro.message = 'Sem comunicação com o servidor. Verifique o Wi-Fi e a configuração.';
+    } else if (typeof erro.response.data === 'string' && erro.response.data) {
+      erro.message = erro.response.data;
+    } else {
+      erro.message = `O servidor respondeu HTTP ${erro.response.status}.`;
+    }
   }
-  return apiBaseUrl;
-}
+  return Promise.reject(erro);
+});
 
 /**
  * TODO(config): código da empresa (parâmetro `empresa` exigido pelas rotas
@@ -41,7 +54,7 @@ export function atraso(ms: number = ATRASO_SIMULADO_MS): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** Data de hoje no formato ISO (yyyy-MM-dd) exigido pelos parâmetros `data`/`StrToDate` do servidor. */
+/** Data de hoje no formato ISO (yyyy-MM-dd), para uso local (SQLite). */
 export function dataDeHojeIso(): string {
   const hoje = new Date();
   const ano = hoje.getFullYear();
@@ -50,106 +63,38 @@ export function dataDeHojeIso(): string {
   return `${ano}-${mes}-${dia}`;
 }
 
-function montarUrl(caminho: string, query: Record<string, string | number>): string {
-  const baseUrl = obterApiBaseUrlObrigatoria();
-  const parametros = new URLSearchParams(
-    Object.entries(query).map(([chave, valor]) => [chave, String(valor)]),
-  ).toString();
-
-  return parametros ? `${baseUrl}/${caminho}?${parametros}` : `${baseUrl}/${caminho}`;
-}
-
 /**
- * GET genérico para as rotas Horse do servidorGerencePlus. Os handlers do
- * servidor sempre serializam os campos como string (`Fields[i].AsString`),
- * então quem consome a resposta é responsável por converter número/data.
+ * Data de hoje no formato dd/MM/yyyy exigido pelo parâmetro `data` das rotas
+ * do servidorGerencePlus: o `StrToDate` delas usa o `FormatSettings` padrão
+ * da máquina (pt-BR), sem conversão de ISO — mandar `yyyy-MM-dd` faz o
+ * `StrToDate` explodir (ex.: interpreta "2026" como dia).
  */
-export async function apiGet<T>(
-  caminho: string,
-  query: Record<string, string | number> = {},
-): Promise<T> {
-  const resposta = await fetch(montarUrl(caminho, query));
-
-  if (!resposta.ok) {
-    throw new Error(`Falha ao consultar ${caminho} (HTTP ${resposta.status}).`);
-  }
-
-  return resposta.json() as Promise<T>;
-}
-
-export async function apiGetOuNulo<T>(
-  caminho: string,
-  query: Record<string, string | number> = {},
-): Promise<T | null> {
-  const resposta = await fetch(montarUrl(caminho, query));
-
-  if (resposta.status === 404) {
-    return null;
-  }
-
-  if (!resposta.ok) {
-    throw new Error(`Falha ao consultar ${caminho} (HTTP ${resposta.status}).`);
-  }
-
-  return resposta.json() as Promise<T>;
+export function dataDeHojeServidor(): string {
+  const hoje = new Date();
+  const dia = String(hoje.getDate()).padStart(2, '0');
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  const ano = hoje.getFullYear();
+  return `${dia}/${mes}/${ano}`;
 }
 
 /**
  * Testa se o servidor responde em `/ping` (usado antes de salvar a
- * configuração). Recebe IP/porta explícitos para testar antes de aplicá-los.
- * Retorna `null` quando conectou, ou o motivo da falha.
+ * configuração). Recebe IP/porta explícitos para testar antes de aplicá-los
+ * em `api` — por isso não usa a instância `api` (cujo `baseURL` só é
+ * definido depois que o teste passa).
  */
 export async function testarConexao(ip: string, porta: string, tempoLimiteMs = 8000): Promise<string | null> {
   const url = `http://${ip}:${porta}/ping`;
-  const controle = new AbortController();
-  const timer = setTimeout(() => controle.abort(), tempoLimiteMs);
   try {
-    const resposta = await fetch(url, { signal: controle.signal });
-    return resposta.ok ? null : `O servidor respondeu HTTP ${resposta.status} em ${url}.`;
+    const resposta = await axios.get(url, { timeout: tempoLimiteMs });
+    return resposta.status === 200 ? null : `O servidor respondeu HTTP ${resposta.status} em ${url}.`;
   } catch (erro) {
-    if ((erro as Error)?.name === 'AbortError') {
+    if (axios.isAxiosError(erro) && erro.code === 'ECONNABORTED') {
       return `Sem resposta de ${url} em ${tempoLimiteMs / 1000}s. Verifique se o aparelho está na mesma rede do servidor e se o ServidorGerencePlus está aberto.`;
     }
-    return `Falha de rede ao acessar ${url} (${(erro as Error)?.message || 'erro desconhecido'}). Verifique o Wi-Fi e o IP informado.`;
-  } finally {
-    clearTimeout(timer);
+    const mensagem = axios.isAxiosError(erro) ? erro.message : String(erro);
+    return `Falha de rede ao acessar ${url} (${mensagem}). Verifique o Wi-Fi e o IP informado.`;
   }
 }
 
-/**
- * POST para as rotas Horse que respondem com texto puro (ex.: `/Terminal`
- * devolve o código do terminal). Sem corpo; os dados vão na query string.
- */
-export async function apiPostTexto(
-  caminho: string,
-  query: Record<string, string | number> = {},
-): Promise<string> {
-  const resposta = await fetch(montarUrl(caminho, query), { method: 'POST' });
-  const texto = (await resposta.text()).trim();
-
-  if (!resposta.ok) {
-    throw new Error(texto || `Falha ao enviar ${caminho} (HTTP ${resposta.status}).`);
-  }
-  return texto;
-}
-
-/**
- * PUT genérico para as rotas Horse do servidorGerencePlus que respondem com
- * um Boolean serializado como texto puro (`Res.Send(vResposta.ToString)`,
- * ou seja "True"/"False" — não é JSON). Uma resposta 404 é um "não
- * encontrado" esperado (a rota devolve "False" + 404 quando o registro não
- * existe/não está mais em aberto), não um erro de transporte.
- */
-export async function apiPut(
-  caminho: string,
-  query: Record<string, string | number> = {},
-): Promise<boolean> {
-  const resposta = await fetch(montarUrl(caminho, query), { method: 'PUT' });
-
-  if (!resposta.ok && resposta.status !== 404) {
-    throw new Error(`Falha ao atualizar ${caminho} (HTTP ${resposta.status}).`);
-  }
-
-  const texto = (await resposta.text()).trim();
-  return texto === 'True';
-}
+export default api;

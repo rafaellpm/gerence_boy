@@ -1,4 +1,4 @@
-import { apiGetOuNulo } from './api';
+import { api } from './api';
 import { Entregador } from './types';
 
 type FuncionarioApi = {
@@ -29,10 +29,10 @@ function mapearFuncionario(funcionario: FuncionarioApi): Entregador {
 export async function buscarPorCodigo(
   codigo: string,
 ): Promise<Entregador | null> {
-  const funcionario = await apiGetOuNulo<FuncionarioApi>(
-    `entregador/${encodeURIComponent(codigo.trim())}`,
-  );
-  return funcionario ? mapearFuncionario(funcionario) : null;
+  const resposta = await api.get<FuncionarioApi>(`entregador/${encodeURIComponent(codigo.trim())}`, {
+    validateStatus: status => (status >= 200 && status < 300) || status === 404,
+  });
+  return resposta.status === 404 ? null : mapearFuncionario(resposta.data);
 }
 
 export const entregadorService = {
