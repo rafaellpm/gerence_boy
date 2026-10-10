@@ -21,7 +21,7 @@ const TAMANHO_MAXIMO_SERIAL = 20;
  */
 export async function registrarTerminal(cdTerminalAtual: number): Promise<number> {
   const modelo = DeviceInfo.getDeviceNameSync();
-  const serial = (await DeviceInfo.getUniqueId()).toUpperCase().slice(0, TAMANHO_MAXIMO_SERIAL);
+  const serial = (await DeviceInfo.getUniqueId()).toUpperCase();
 
   const resposta = await api.post('Terminal', null, {
     params: { terminal: cdTerminalAtual, modelo, serial },
