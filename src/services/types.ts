@@ -10,6 +10,11 @@ export type SituacaoEntrega = 'PENDENTE' | 'EM_ROTA' | 'ENTREGUE' | 'CANCELADA';
 
 export type FormaPagamento = 'DINHEIRO' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO' | 'PIX';
 
+export type Pagamento = {
+  formaPagamento: FormaPagamento;
+  valor: number;
+};
+
 export type Entrega = {
   id: string;
   codigo: string;
@@ -19,8 +24,8 @@ export type Entrega = {
   latitude?: number;
   longitude?: number;
   situacao: SituacaoEntrega;
-  formaPagamento?: FormaPagamento;
-  valor?: number;
+  /** Uma venda pode ter mais de um pagamento (ex.: parte em dinheiro, parte no cartão) — só preenchido pra entregas já ENTREGUE (ver `localDb.listarEntreguesPorDia`). */
+  pagamentos?: Pagamento[];
   entregueEm?: string;
 };
 

@@ -45,14 +45,22 @@ export function PagamentosScreen(_props: Props) {
     carregar();
   }, [carregar]);
 
-  const totalGeral = entregas.reduce((soma, item) => soma + (item.valor ?? 0), 0);
+  function totalDaEntrega(entrega: Entrega): number {
+    return (entrega.pagamentos ?? []).reduce((soma, pagamento) => soma + pagamento.valor, 0);
+  }
+
+  const totalGeral = entregas.reduce((soma, item) => soma + totalDaEntrega(item), 0);
+
+  // Resumo geral por forma de pagamento — soma todos os pagamentos de todas
+  // as vendas no período, sem distinguir de qual venda cada um veio.
+  const todosPagamentos = entregas.flatMap(item => item.pagamentos ?? []);
 
   const totaisPorForma = FORMAS_PAGAMENTO.map(forma => {
-    const doFormato = entregas.filter(item => item.formaPagamento === forma.valor);
+    const doFormato = todosPagamentos.filter(pagamento => pagamento.formaPagamento === forma.valor);
     return {
       ...forma,
       quantidade: doFormato.length,
-      total: doFormato.reduce((soma, item) => soma + (item.valor ?? 0), 0),
+      total: doFormato.reduce((soma, pagamento) => soma + pagamento.valor, 0),
     };
   }).filter(item => item.quantidade > 0);
 
@@ -109,21 +117,21 @@ export function PagamentosScreen(_props: Props) {
               </View>
               <Text style={styles.cardCliente}>{item.cliente}</Text>
               <View style={styles.cardRodape}>
-                <View style={styles.cardForma}>
-                  {item.formaPagamento && (
-                    <>
+                <View style={styles.cardFormas}>
+                  {(item.pagamentos ?? []).map((pagamento, indice) => (
+                    <View key={`${pagamento.formaPagamento}-${indice}`} style={styles.cardForma}>
                       <Icon
-                        name={iconeFormaPagamento(item.formaPagamento)}
-                        size={16}
+                        name={iconeFormaPagamento(pagamento.formaPagamento)}
+                        size={14}
                         color={cores.textoSecundario}
                       />
                       <Text style={styles.cardFormaTexto}>
-                        {rotuloFormaPagamento(item.formaPagamento)}
+                        {rotuloFormaPagamento(pagamento.formaPagamento)} · {formatarMoeda(pagamento.valor)}
                       </Text>
-                    </>
-                  )}
+                    </View>
+                  ))}
                 </View>
-                <Text style={styles.cardValor}>{formatarMoeda(item.valor ?? 0)}</Text>
+                <Text style={styles.cardValor}>{formatarMoeda(totalDaEntrega(item))}</Text>
               </View>
             </View>
           )}
@@ -315,8 +323,12 @@ const styles = StyleSheet.create({
   cardRodape: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: 4,
+  },
+  cardFormas: {
+    gap: 4,
+    flex: 1,
   },
   cardForma: {
     flexDirection: 'row',

@@ -1,6 +1,6 @@
 import { open } from '@op-engineering/op-sqlite';
 import { dataHoraLocalIso } from '../utils/dataHora';
-import { ConfiguracaoServidor, Entrega, Entregador, FormaPagamento, SituacaoEntrega } from './types';
+import { ConfiguracaoServidor, Entrega, Entregador, FormaPagamento, Pagamento, SituacaoEntrega } from './types';
 
 const db = open({ name: 'gerenceboy.db' });
 
@@ -51,6 +51,20 @@ function garantirTabela(): Promise<void> {
           `CREATE TABLE IF NOT EXISTS app_config (
             chave TEXT PRIMARY KEY,
             valor TEXT NOT NULL
+          )`,
+        ),
+      )
+      // Uma venda pode ter mais de um pagamento (parte em dinheiro, parte no
+      // cartão) — por isso fica numa tabela própria em vez das colunas
+      // forma_pagamento/valor de entregas_bipadas (que só guardavam 1 por entrega).
+      .then(() =>
+        db.execute(
+          `CREATE TABLE IF NOT EXISTS entregas_pagamentos (
+            entregador_codigo TEXT NOT NULL,
+            codigo TEXT NOT NULL,
+            forma_pagamento TEXT NOT NULL,
+            valor REAL NOT NULL,
+            criado_em TEXT NOT NULL
           )`,
         ),
       )
@@ -139,8 +153,6 @@ function linhaParaEntrega(linha: Record<string, unknown>): Entrega {
     latitude: linha.latitude == null ? undefined : Number(linha.latitude),
     longitude: linha.longitude == null ? undefined : Number(linha.longitude),
     situacao: linha.situacao as SituacaoEntrega,
-    formaPagamento: linha.forma_pagamento == null ? undefined : (linha.forma_pagamento as FormaPagamento),
-    valor: linha.valor == null ? undefined : Number(linha.valor),
     entregueEm: linha.entregue_em == null ? undefined : String(linha.entregue_em),
   };
 }
@@ -199,20 +211,44 @@ export async function listarEntregasPendentes(entregadorCodigo: string): Promise
   return resultado.rows.map(linhaParaEntrega);
 }
 
+/** Marca a entrega como entregue e grava um ou mais pagamentos pra ela (ex.: parte em dinheiro, parte no cartão). */
 export async function marcarEntregueLocal(
   entregadorCodigo: string,
   codigo: string,
-  formaPagamento: FormaPagamento,
-  valor: number,
+  pagamentos: Pagamento[],
 ): Promise<void> {
   await garantirTabela();
 
+  const agora = dataHoraLocalIso();
+
+  for (const pagamento of pagamentos) {
+    await db.execute(
+      `INSERT INTO entregas_pagamentos (entregador_codigo, codigo, forma_pagamento, valor, criado_em)
+       VALUES (?, ?, ?, ?, ?)`,
+      [entregadorCodigo, codigo, pagamento.formaPagamento, pagamento.valor, agora],
+    );
+  }
+
   await db.execute(
     `UPDATE entregas_bipadas
-     SET situacao = 'ENTREGUE', forma_pagamento = ?, valor = ?, entregue_em = ?
+     SET situacao = 'ENTREGUE', entregue_em = ?
      WHERE entregador_codigo = ? AND codigo = ?`,
-    [formaPagamento, valor, dataHoraLocalIso(), entregadorCodigo, codigo],
+    [agora, entregadorCodigo, codigo],
   );
+}
+
+async function listarPagamentosDaEntrega(entregadorCodigo: string, codigo: string): Promise<Pagamento[]> {
+  const resultado = await db.execute(
+    `SELECT forma_pagamento, valor FROM entregas_pagamentos
+     WHERE entregador_codigo = ? AND codigo = ?
+     ORDER BY criado_em ASC`,
+    [entregadorCodigo, codigo],
+  );
+
+  return resultado.rows.map(linha => ({
+    formaPagamento: linha.forma_pagamento as FormaPagamento,
+    valor: Number(linha.valor),
+  }));
 }
 
 export async function listarEntreguesPorDia(
@@ -234,7 +270,13 @@ export async function listarEntreguesPorDia(
     [entregadorCodigo, inicio, fim],
   );
 
-  return resultado.rows.map(linhaParaEntrega);
+  const entregas = resultado.rows.map(linhaParaEntrega);
+
+  for (const entrega of entregas) {
+    entrega.pagamentos = await listarPagamentosDaEntrega(entregadorCodigo, entrega.codigo);
+  }
+
+  return entregas;
 }
 
 export const localDb = {

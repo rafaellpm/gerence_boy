@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { entregaService, Entrega, Entregador, FormaPagamento } from '../services';
+import { entregaService, Entrega, Entregador, Pagamento } from '../services';
 import { localDb } from '../services/localDb';
 
 type EntregadorContextValue = {
@@ -26,12 +26,8 @@ type EntregadorContextValue = {
    * da lista.
    */
   recarregarEntregas: () => Promise<void>;
-  /** Marca a entrega como entregue só no banco local do app (sem chamar a API) e some da listagem. */
-  confirmarEntregaLocal: (
-    codigo: string,
-    formaPagamento: FormaPagamento,
-    valor: number,
-  ) => Promise<void>;
+  /** Marca a entrega como entregue (com um ou mais pagamentos) só no banco local do app (sem chamar a API) e some da listagem. */
+  confirmarEntregaLocal: (codigo: string, pagamentos: Pagamento[]) => Promise<void>;
   /**
    * Entrega escolhida para exibir na aba "Mapa". Necessário porque a aba faz
    * parte do bottom tab navigator e não recebe parâmetros de rota ao ser
@@ -110,12 +106,12 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
   }, [entregador, recarregarEntregas]);
 
   const confirmarEntregaLocal = useCallback(
-    async (codigo: string, formaPagamento: FormaPagamento, valor: number): Promise<void> => {
+    async (codigo: string, pagamentos: Pagamento[]): Promise<void> => {
       if (!entregador) {
         return;
       }
 
-      await localDb.marcarEntregueLocal(entregador.codigo, codigo, formaPagamento, valor);
+      await localDb.marcarEntregueLocal(entregador.codigo, codigo, pagamentos);
 
       setEntregas(atual => atual.filter(item => item.codigo !== codigo));
       setEntregaEmFoco(atual => (atual?.codigo === codigo ? null : atual));

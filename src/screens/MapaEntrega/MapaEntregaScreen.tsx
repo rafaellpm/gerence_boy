@@ -11,7 +11,7 @@ import { SairHeaderButton } from '../../components/SairHeaderButton';
 import { useEntregadorContext } from '../../contexts/EntregadorContext';
 import { MainTabParamList } from '../../navigation/types';
 import { geocodificarEndereco } from '../../services/geocodingService';
-import { Entrega, FormaPagamento } from '../../services';
+import { Entrega, Pagamento } from '../../services';
 import { cores } from '../../theme/colors';
 import { abrirEntregaNoGoogleMaps, abrirRotaCompletaNoGoogleMaps } from '../../utils/maps';
 
@@ -166,7 +166,7 @@ export function MapaEntregaScreen(_props: Props) {
     setEntregaParaPagamento(entregaAtual);
   }
 
-  async function handleConfirmarPagamento(formaPagamento: FormaPagamento, valor: number) {
+  async function handleConfirmarPagamento(pagamentos: Pagamento[]) {
     if (!entregaParaPagamento) {
       return;
     }
@@ -174,7 +174,7 @@ export function MapaEntregaScreen(_props: Props) {
     setConfirmandoPagamento(true);
 
     try {
-      await confirmarEntregaLocal(entregaParaPagamento.codigo, formaPagamento, valor);
+      await confirmarEntregaLocal(entregaParaPagamento.codigo, pagamentos);
       setEntregaParaPagamento(null);
     } catch {
       Alert.alert('Erro ao marcar entrega', 'Não foi possível salvar no banco local do dispositivo.');

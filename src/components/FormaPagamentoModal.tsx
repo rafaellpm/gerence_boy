@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Entrega, FormaPagamento } from '../services';
+import { Entrega, FormaPagamento, Pagamento } from '../services';
 import { cores } from '../theme/colors';
-import { FORMAS_PAGAMENTO } from '../utils/formaPagamento';
+import { formatarMoeda } from '../utils/dataHora';
+import { FORMAS_PAGAMENTO, iconeFormaPagamento, rotuloFormaPagamento } from '../utils/formaPagamento';
 import { BotaoGrande } from './BotaoGrande';
 import { BottomSheet } from './BottomSheet';
 
 type FormaPagamentoModalProps = {
   entrega: Entrega | null;
   onFechar: () => void;
-  onConfirmar: (formaPagamento: FormaPagamento, valor: number) => void;
+  onConfirmar: (pagamentos: Pagamento[]) => void;
   confirmando?: boolean;
 };
 
@@ -18,6 +19,14 @@ function digitosParaValor(digitos: string): number {
   return Number(digitos || '0') / 100;
 }
 
+/**
+ * Confirma a entrega podendo registrar mais de um pagamento pra mesma venda
+ * (ex.: parte em dinheiro, parte no cartão) — "+ Adicionar outro pagamento"
+ * guarda o forma/valor atual na lista e limpa os campos pro próximo; o
+ * "Confirmar entrega" sempre inclui o que estiver preenchido no momento,
+ * então um pagamento único continua sendo só selecionar a forma e digitar
+ * o valor, sem precisar desse botão extra.
+ */
 export function FormaPagamentoModal({
   entrega,
   onFechar,
@@ -26,12 +35,14 @@ export function FormaPagamentoModal({
 }: FormaPagamentoModalProps) {
   const [formaSelecionada, setFormaSelecionada] = useState<FormaPagamento | null>(null);
   const [digitosValor, setDigitosValor] = useState('');
+  const [pagamentosAdicionados, setPagamentosAdicionados] = useState<Pagamento[]>([]);
   const [tecladoVisivel, setTecladoVisivel] = useState(false);
 
   useEffect(() => {
     if (entrega) {
       setFormaSelecionada(null);
       setDigitosValor('');
+      setPagamentosAdicionados([]);
     }
   }, [entrega]);
 
@@ -52,12 +63,30 @@ export function FormaPagamentoModal({
     };
   }, []);
 
-  const valor = digitosParaValor(digitosValor);
-  const podeConfirmar = !!formaSelecionada && valor > 0 && !confirmando;
+  const valorAtual = digitosParaValor(digitosValor);
+  const rascunhoValido = !!formaSelecionada && valorAtual > 0;
+  const pagamentosFinais: Pagamento[] = rascunhoValido
+    ? [...pagamentosAdicionados, { formaPagamento: formaSelecionada!, valor: valorAtual }]
+    : pagamentosAdicionados;
+  const totalFinal = pagamentosFinais.reduce((soma, item) => soma + item.valor, 0);
+  const podeConfirmar = pagamentosFinais.length > 0 && !confirmando;
+
+  function handleAdicionarPagamento() {
+    if (!rascunhoValido) {
+      return;
+    }
+    setPagamentosAdicionados(atual => [...atual, { formaPagamento: formaSelecionada!, valor: valorAtual }]);
+    setFormaSelecionada(null);
+    setDigitosValor('');
+  }
+
+  function handleRemoverPagamento(indice: number) {
+    setPagamentosAdicionados(atual => atual.filter((_, i) => i !== indice));
+  }
 
   function handleConfirmar() {
-    if (formaSelecionada && valor > 0) {
-      onConfirmar(formaSelecionada, valor);
+    if (pagamentosFinais.length > 0) {
+      onConfirmar(pagamentosFinais);
     }
   }
 
@@ -75,7 +104,30 @@ export function FormaPagamentoModal({
             {entrega.numeroPedido} · {entrega.cliente}
           </Text>
 
-          <Text style={styles.rotulo}>Forma de pagamento</Text>
+          {pagamentosAdicionados.length > 0 && (
+            <View style={styles.listaAdicionados}>
+              {pagamentosAdicionados.map((pagamento, indice) => (
+                <View key={`${pagamento.formaPagamento}-${indice}`} style={styles.linhaAdicionada}>
+                  <Icon
+                    name={iconeFormaPagamento(pagamento.formaPagamento)}
+                    size={16}
+                    color={cores.textoSecundario}
+                  />
+                  <Text style={styles.linhaAdicionadaTexto}>
+                    {rotuloFormaPagamento(pagamento.formaPagamento)}
+                  </Text>
+                  <Text style={styles.linhaAdicionadaValor}>{formatarMoeda(pagamento.valor)}</Text>
+                  <Pressable onPress={() => handleRemoverPagamento(indice)} hitSlop={8}>
+                    <Icon name="close" size={18} color={cores.textoSecundario} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <Text style={styles.rotulo}>
+            {pagamentosAdicionados.length > 0 ? 'Outro pagamento' : 'Forma de pagamento'}
+          </Text>
           <View style={styles.opcoesPagamento}>
             {FORMAS_PAGAMENTO.map(forma => {
               const selecionada = formaSelecionada === forma.valor;
@@ -108,18 +160,34 @@ export function FormaPagamentoModal({
           </View>
 
           <Text style={styles.rotulo}>Valor recebido</Text>
-          <View style={styles.campoValor}>
-            <Text style={styles.prefixoValor}>R$</Text>
-            <TextInput
-              style={styles.inputValor}
-              keyboardType="numeric"
-              placeholder="0,00"
-              placeholderTextColor={cores.textoPlaceholder}
-              value={valor > 0 ? valor.toFixed(2).replace('.', ',') : ''}
-              onChangeText={texto => setDigitosValor(texto.replace(/\D/g, ''))}
-              editable={!confirmando}
-            />
+          <View style={styles.linhaValor}>
+            <View style={styles.campoValor}>
+              <Text style={styles.prefixoValor}>R$</Text>
+              <TextInput
+                style={styles.inputValor}
+                keyboardType="numeric"
+                placeholder="0,00"
+                placeholderTextColor={cores.textoPlaceholder}
+                value={valorAtual > 0 ? valorAtual.toFixed(2).replace('.', ',') : ''}
+                onChangeText={texto => setDigitosValor(texto.replace(/\D/g, ''))}
+                editable={!confirmando}
+              />
+            </View>
+
+            <Pressable
+              onPress={handleAdicionarPagamento}
+              disabled={!rascunhoValido || confirmando}
+              style={[styles.botaoAdicionar, !rascunhoValido && styles.botaoAdicionarDesabilitado]}
+              accessibilityRole="button"
+              accessibilityLabel="Adicionar outro pagamento"
+            >
+              <Icon name="plus" size={22} color={cores.primariaTexto} />
+            </Pressable>
           </View>
+
+          {pagamentosAdicionados.length > 0 && (
+            <Text style={styles.totalGeral}>Total: {formatarMoeda(totalFinal)}</Text>
+          )}
 
           <BotaoGrande
             titulo="Confirmar entrega"
@@ -165,6 +233,30 @@ const styles = StyleSheet.create({
     color: cores.textoSecundario,
     marginBottom: 8,
   },
+  listaAdicionados: {
+    gap: 6,
+    marginBottom: 16,
+  },
+  linhaAdicionada: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: cores.fundo,
+  },
+  linhaAdicionadaTexto: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: cores.texto,
+  },
+  linhaAdicionadaValor: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: cores.texto,
+  },
   opcoesPagamento: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -194,14 +286,20 @@ const styles = StyleSheet.create({
   opcaoPagamentoTextoSelecionado: {
     color: cores.primariaTexto,
   },
+  linhaValor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
   campoValor: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: cores.bordaForte,
     borderRadius: 12,
     paddingHorizontal: 14,
-    marginBottom: 20,
     backgroundColor: cores.superficie,
   },
   prefixoValor: {
@@ -216,6 +314,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: cores.texto,
     paddingVertical: 14,
+  },
+  botaoAdicionar: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: cores.primaria,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botaoAdicionarDesabilitado: {
+    opacity: 0.4,
+  },
+  totalGeral: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: cores.texto,
+    marginBottom: 12,
+    textAlign: 'right',
   },
   botaoConfirmar: {
     marginBottom: 4,

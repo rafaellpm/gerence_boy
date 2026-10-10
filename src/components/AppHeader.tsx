@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cores } from '../theme/colors';
 
@@ -20,6 +20,8 @@ export function AppHeader({ titulo, subtitulo, direita }: AppHeaderProps) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      <Image source={require('../images/icon_boy_46x46.png')} style={styles.icone} />
+
       <View style={styles.textos}>
         <Text style={styles.titulo} numberOfLines={1}>
           {titulo}
@@ -45,6 +47,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 14,
     backgroundColor: cores.tabFundo,
+  },
+  icone: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
   },
   textos: {
     flex: 1,
