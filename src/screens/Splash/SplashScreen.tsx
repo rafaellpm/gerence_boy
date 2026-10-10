@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEntregadorContext } from '../../contexts/EntregadorContext';
 import { RootStackParamList } from '../../navigation/types';
-import { configurarApiBaseUrl } from '../../services/api';
+import { configurarApiBaseUrl, configurarTerminal } from '../../services/api';
 import { localDb } from '../../services/localDb';
 import { cores } from '../../theme/colors';
 
@@ -44,6 +44,7 @@ export function SplashScreen({ navigation }: Props) {
       }
 
       configurarApiBaseUrl(configuracao.ip, configuracao.porta);
+      configurarTerminal(cdTerminal);
 
       const entregadorPermanente = await localDb.obterEntregadorPermanente();
 

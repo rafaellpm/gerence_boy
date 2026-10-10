@@ -60,13 +60,22 @@ export function ListaEntregasScreen({ navigation }: Props) {
 
       switch (resultado.status) {
         case 'VINCULADO':
-        case 'JA_VINCULADO_VOCE':
+        case 'JA_VINCULADO_VOCE': {
+          const primeiraEntrega = entregas.length === 0;
           await recarregarEntregas();
-          Alert.alert(
-            resultado.status === 'VINCULADO' ? 'Entrega vinculada' : 'Entrega já na lista',
-            `${resultado.entrega.numeroPedido} — ${resultado.entrega.cliente}`,
-          );
+
+          if (primeiraEntrega) {
+            // Primeira entrega da sessão: já leva direto pro mapa focado nela.
+            focarEntregaNoMapa(resultado.entrega);
+            navigation.navigate('Mapa');
+          } else {
+            Alert.alert(
+              resultado.status === 'VINCULADO' ? 'Entrega vinculada' : 'Entrega já na lista',
+              `${resultado.entrega.numeroPedido} — ${resultado.entrega.cliente}`,
+            );
+          }
           break;
+        }
         case 'JA_VINCULADO_OUTRO':
           Alert.alert('Pedido já vinculado', `Esse pedido já está com ${resultado.entregadorAtual}.`);
           break;

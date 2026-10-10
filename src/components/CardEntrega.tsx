@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Entrega } from '../services';
 import { cores } from '../theme/colors';
+import { formatarMoeda } from '../utils/dataHora';
 import { BadgeSituacao } from './BadgeSituacao';
 import { BotaoGrande } from './BotaoGrande';
 
@@ -20,6 +21,9 @@ export function CardEntrega({ entrega, onAbrirOpcoes }: CardEntregaProps) {
 
       <Text style={styles.cliente}>{entrega.cliente}</Text>
       <Text style={styles.endereco}>{entrega.endereco}</Text>
+      {entrega.valorTotal != null && (
+        <Text style={styles.valor}>Cobrar: {formatarMoeda(entrega.valorTotal)}</Text>
+      )}
 
       <BotaoGrande
         titulo="Opções"
@@ -59,6 +63,11 @@ const styles = StyleSheet.create({
   endereco: {
     fontSize: 14,
     color: cores.textoSecundario,
+  },
+  valor: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: cores.sucesso,
   },
   botaoOpcoes: {
     marginTop: 8,

@@ -104,6 +104,13 @@ export function FormaPagamentoModal({
             {entrega.numeroPedido} · {entrega.cliente}
           </Text>
 
+          {entrega.valorTotal != null && (
+            <View style={styles.valorVenda}>
+              <Text style={styles.valorVendaRotulo}>Valor a cobrar</Text>
+              <Text style={styles.valorVendaValor}>{formatarMoeda(entrega.valorTotal)}</Text>
+            </View>
+          )}
+
           {pagamentosAdicionados.length > 0 && (
             <View style={styles.listaAdicionados}>
               {pagamentosAdicionados.map((pagamento, indice) => (
@@ -226,6 +233,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: cores.textoSecundario,
     marginBottom: 16,
+  },
+  valorVenda: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: cores.fundo,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  valorVendaRotulo: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: cores.textoSecundario,
+  },
+  valorVendaValor: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: cores.sucesso,
   },
   rotulo: {
     fontSize: 13,

@@ -6,7 +6,7 @@ import { BotaoGrande } from '../../components/BotaoGrande';
 import { HeaderTextButton } from '../../components/HeaderTextButton';
 import { ScannerCodigoModal } from '../../components/ScannerCodigoModal';
 import { RootStackParamList } from '../../navigation/types';
-import { configurarApiBaseUrl, testarConexao } from '../../services/api';
+import { configurarApiBaseUrl, configurarTerminal, testarConexao } from '../../services/api';
 import { localDb } from '../../services/localDb';
 import { registrarTerminal, validarIpQrCode } from '../../services/terminalService';
 import { cores } from '../../theme/colors';
@@ -74,6 +74,7 @@ export function ConfiguracaoScreen({ navigation }: Props) {
       await localDb.salvarConfiguracaoServidor({ ip: ipInformado, porta: portaInformada });
       await localDb.salvarTerminal(terminal);
       setCdTerminal(terminal);
+      configurarTerminal(terminal);
 
       await alertar('Tudo certo!', `Aparelho vinculado ao servidor.\nTerminal: ${terminal}`);
 

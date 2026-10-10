@@ -1,7 +1,7 @@
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { Camera, CameraRef, Map, Marker } from '@maplibre/maplibre-react-native';
+import { Camera, CameraRef, Map, Marker, UserLocation } from '@maplibre/maplibre-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/AppHeader';
@@ -48,6 +48,20 @@ export function MapaEntregaScreen(_props: Props) {
   const [entregaParaPagamento, setEntregaParaPagamento] = useState<Entrega | null>(null);
   const [confirmandoPagamento, setConfirmandoPagamento] = useState(false);
   const [minimizado, setMinimizado] = useState(false);
+  const [mapaPronto, setMapaPronto] = useState(false);
+  const [permissaoLocalizacao, setPermissaoLocalizacao] = useState(Platform.OS === 'ios');
+
+  // No Android a permissão precisa ser pedida em tempo de execução; no iOS
+  // o próprio UserLocation nativo já dispara o prompt do sistema sozinho.
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION).then(resultado => {
+      setPermissaoLocalizacao(resultado === PermissionsAndroid.RESULTS.GRANTED);
+    });
+  }, []);
 
   const entregasPendentes = entregas.filter(
     item => item.situacao === 'PENDENTE' || item.situacao === 'EM_ROTA',
@@ -101,18 +115,28 @@ export function MapaEntregaScreen(_props: Props) {
   const latitudeAtual = coordenadaAtual?.latitude;
   const longitudeAtual = coordenadaAtual?.longitude;
 
+  // O <Map> só monta quando há algum ponto geocodificado — se isso some
+  // (ex.: lista esvaziou) e volta depois, é um `<Map>` novo, que precisa
+  // avisar de novo quando estiver pronto.
   useEffect(() => {
-    if (!mostrandoTodas && latitudeAtual != null && longitudeAtual != null) {
-      cameraRef.current?.flyTo({
-        center: [longitudeAtual, latitudeAtual],
-        zoom: ZOOM_FOCO,
-        duration: 700,
-      });
+    if (pontos.length === 0) {
+      setMapaPronto(false);
     }
-  }, [mostrandoTodas, latitudeAtual, longitudeAtual]);
+  }, [pontos.length === 0]);
 
   useEffect(() => {
-    if (!mostrandoTodas || pontos.length === 0) {
+    if (!mapaPronto || mostrandoTodas || latitudeAtual == null || longitudeAtual == null) {
+      return;
+    }
+    cameraRef.current?.flyTo({
+      center: [longitudeAtual, latitudeAtual],
+      zoom: ZOOM_FOCO,
+      duration: 700,
+    });
+  }, [mapaPronto, mostrandoTodas, latitudeAtual, longitudeAtual]);
+
+  useEffect(() => {
+    if (!mapaPronto || !mostrandoTodas || pontos.length === 0) {
       return;
     }
 
@@ -133,7 +157,7 @@ export function MapaEntregaScreen(_props: Props) {
       { padding: { left: 60, right: 60, top: 80, bottom: 220 }, duration: 700 },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- recalcula só quando a lista de pontos muda
-  }, [mostrandoTodas, pontos.map(ponto => ponto.entrega.codigo).join(',')]);
+  }, [mapaPronto, mostrandoTodas, pontos.map(ponto => ponto.entrega.codigo).join(',')]);
 
   function handleFocarProxima() {
     focarEntregaNoMapa(null);
@@ -203,8 +227,15 @@ export function MapaEntregaScreen(_props: Props) {
 
       <View style={styles.container}>
         {pontos.length > 0 ? (
-          <Map style={StyleSheet.absoluteFill} mapStyle={ESTILO_MAPA}>
+          <Map
+            style={StyleSheet.absoluteFill}
+            mapStyle={ESTILO_MAPA}
+            logo={false}
+            onDidFinishLoadingMap={() => setMapaPronto(true)}
+          >
             <Camera ref={cameraRef} initialViewState={{ zoom: ZOOM_FOCO }} />
+
+            {permissaoLocalizacao && <UserLocation />}
 
             {pontos.map(({ entrega, coordenada }) => {
               const emFoco = entrega.codigo === entregaAtual.codigo;

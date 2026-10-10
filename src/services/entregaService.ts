@@ -59,6 +59,7 @@ function mapearVenda(venda: VendaEntregadorApi): Entrega {
     latitude: paraNumeroOuUndefined(venda.DS_LATITUDE),
     longitude: paraNumeroOuUndefined(venda.DS_LONGITUDE),
     situacao: mapearSituacaoVenda(venda.TP_SITUACAOPEDIDO, venda.SITUACAO),
+    valorTotal: paraNumeroOuUndefined(venda.VALOR_TOTAL),
   };
 }
 
@@ -97,6 +98,7 @@ type VinculoEntregadorApi = {
   NR_LOGRADOURO?: string;
   DS_LATITUDE?: string;
   DS_LONGITUDE?: string;
+  VALOR_TOTAL?: string;
   [campo: string]: string | undefined;
 };
 
@@ -115,6 +117,7 @@ function mapearVinculo(venda: VinculoEntregadorApi): Entrega {
     latitude: paraNumeroOuUndefined(venda.DS_LATITUDE),
     longitude: paraNumeroOuUndefined(venda.DS_LONGITUDE),
     situacao: 'EM_ROTA',
+    valorTotal: paraNumeroOuUndefined(venda.VALOR_TOTAL),
   };
 }
 

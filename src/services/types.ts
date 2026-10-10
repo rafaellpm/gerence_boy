@@ -24,6 +24,8 @@ export type Entrega = {
   latitude?: number;
   longitude?: number;
   situacao: SituacaoEntrega;
+  /** Valor total da venda (NOTA_VENDA.VALOR_TOTAL) — quanto o entregador deve cobrar do cliente. */
+  valorTotal?: number;
   /** Uma venda pode ter mais de um pagamento (ex.: parte em dinheiro, parte no cartão) — só preenchido pra entregas já ENTREGUE (ver `localDb.listarEntreguesPorDia`). */
   pagamentos?: Pagamento[];
   entregueEm?: string;

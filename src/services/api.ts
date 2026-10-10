@@ -20,6 +20,26 @@ export function configurarApiBaseUrl(ip: string, porta: string): void {
   api.defaults.baseURL = `http://${ip}:${porta}`;
 }
 
+let cdTerminalAtual: number | null = null;
+
+/**
+ * Código do terminal (devolvido pelo `POST /Terminal` no registro do
+ * aparelho) — chamado pela `SplashScreen`/`ConfiguracaoScreen` assim que o
+ * terminal é conhecido. O interceptor abaixo manda esse código em toda
+ * chamada, pra rotas do entregador (login/vincular/listar) poderem checar
+ * no servidor se este terminal ainda está ativo em CAD_TERMINAL.
+ */
+export function configurarTerminal(cdTerminal: number): void {
+  cdTerminalAtual = cdTerminal;
+}
+
+api.interceptors.request.use(config => {
+  if (cdTerminalAtual != null) {
+    config.params = { ...config.params, terminal: cdTerminalAtual };
+  }
+  return config;
+});
+
 api.interceptors.response.use(undefined, erro => {
   if (axios.isAxiosError(erro)) {
     if (erro.code === 'ECONNABORTED') {
