@@ -19,17 +19,32 @@ import { abrirEntregaNoGoogleMaps } from '../../utils/maps';
 type Props = BottomTabScreenProps<MainTabParamList, 'MinhasEntregas'>;
 
 export function ListaEntregasScreen({ navigation }: Props) {
-  const { entregador, entregas, adicionarEntrega, confirmarEntregaLocal, focarEntregaNoMapa } = useEntregadorContext();
+  const { entregador, entregas, recarregarEntregas, confirmarEntregaLocal, focarEntregaNoMapa } =
+    useEntregadorContext();
   const [entregaSelecionada, setEntregaSelecionada] = useState<Entrega | null>(null);
   const [entregaParaPagamento, setEntregaParaPagamento] = useState<Entrega | null>(null);
   const [confirmandoPagamento, setConfirmandoPagamento] = useState(false);
   const [scannerAberto, setScannerAberto] = useState(false);
   const [bipando, setBipando] = useState(false);
+  const [atualizando, setAtualizando] = useState(false);
+
+  async function handleAtualizar() {
+    setAtualizando(true);
+    try {
+      await recarregarEntregas();
+    } catch (erro) {
+      Alert.alert('Erro ao atualizar', erro instanceof Error ? erro.message : String(erro));
+    } finally {
+      setAtualizando(false);
+    }
+  }
 
   /**
    * Bipar a venda vincula direto no servidor (PUT), sem consultar antes —
    * `fVinculaEntregadorPedido` já valida lá se o pedido existe e se já está
-   * vinculado a este ou a outro entregador.
+   * vinculado a este ou a outro entregador. Depois, em vez de adicionar a
+   * venda que veio na resposta direto na lista, recarrega tudo do servidor
+   * (mesma fonte de verdade do "arrastar pra atualizar").
    */
   async function lerCodigoEntrega(codigo: string) {
     setScannerAberto(false);
@@ -45,15 +60,13 @@ export function ListaEntregasScreen({ navigation }: Props) {
 
       switch (resultado.status) {
         case 'VINCULADO':
-        case 'JA_VINCULADO_VOCE': {
-          const adicionado = await adicionarEntrega(resultado.entrega);
-          if (adicionado === 'DUPLICADA') {
-            Alert.alert('Entrega já na lista', `${resultado.entrega.numeroPedido} já está na lista.`);
-          } else {
-            Alert.alert('Entrega vinculada', `${resultado.entrega.numeroPedido} — ${resultado.entrega.cliente}`);
-          }
+        case 'JA_VINCULADO_VOCE':
+          await recarregarEntregas();
+          Alert.alert(
+            resultado.status === 'VINCULADO' ? 'Entrega vinculada' : 'Entrega já na lista',
+            `${resultado.entrega.numeroPedido} — ${resultado.entrega.cliente}`,
+          );
           break;
-        }
         case 'JA_VINCULADO_OUTRO':
           Alert.alert('Pedido já vinculado', `Esse pedido já está com ${resultado.entregadorAtual}.`);
           break;
@@ -132,6 +145,7 @@ export function ListaEntregasScreen({ navigation }: Props) {
             titulo="Ver próxima entrega no mapa"
             icone="map-marker-path"
             onPress={handleVerProximaNoMapa}
+            compacto
           />
         )}
 
@@ -139,8 +153,10 @@ export function ListaEntregasScreen({ navigation }: Props) {
           data={entregas}
           keyExtractor={item => item.codigo}
           contentContainerStyle={styles.lista}
+          refreshing={atualizando}
+          onRefresh={handleAtualizar}
           ListEmptyComponent={
-            <Text style={styles.vazio}>Nenhuma entrega bipada ainda.</Text>
+            <Text style={styles.vazio}>Nenhuma entrega vinculada ainda.</Text>
           }
           renderItem={({ item }) => (
             <CardEntrega entrega={item} onAbrirOpcoes={setEntregaSelecionada} />

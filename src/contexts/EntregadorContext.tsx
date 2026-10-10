@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { Entrega, Entregador, FormaPagamento } from '../services';
+import { entregaService, Entrega, Entregador, FormaPagamento } from '../services';
 import { localDb } from '../services/localDb';
 
 type EntregadorContextValue = {
@@ -19,7 +19,13 @@ type EntregadorContextValue = {
    */
   selecionarEntregador: (entregador: Entregador, permanecerLogado?: boolean) => void;
   encerrarSessao: () => void;
-  adicionarEntrega: (entrega: Entrega) => Promise<'ADICIONADA' | 'DUPLICADA'>;
+  /**
+   * Busca no servidor as vendas de entrega já vinculadas a este entregador
+   * e substitui `entregas` pelo que veio de lá (não acumula localmente) —
+   * usado tanto no carregamento inicial quanto no "arrastar pra atualizar"
+   * da lista.
+   */
+  recarregarEntregas: () => Promise<void>;
   /** Marca a entrega como entregue só no banco local do app (sem chamar a API) e some da listagem. */
   confirmarEntregaLocal: (
     codigo: string,
@@ -70,42 +76,33 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
     setEntregaEmFoco(entrega);
   }, []);
 
-  // Ao identificar o entregador, carrega do SQLite local as entregas dele
-  // que ainda estão pra entrega (persistem entre sessões/reinícios do app).
+  const recarregarEntregas = useCallback(async () => {
+    if (!entregador) {
+      return;
+    }
+
+    const vendas = await entregaService.buscarVendasDoEntregador(entregador.codigo);
+
+    // Guarda uma cópia local (SQLite) de cada venda vinda do servidor — só
+    // pra "marcar como entregue" (confirmarEntregaLocal) e a tela de
+    // Pagamentos terem uma linha pra atualizar; a confirmação de entrega em
+    // si continua sendo só local, sem rota no servidor pra isso.
+    for (const venda of vendas) {
+      await localDb.salvarEntregaBipada(entregador.codigo, venda);
+    }
+
+    setEntregas(vendas);
+  }, [entregador]);
+
+  // Ao identificar o entregador, busca no servidor as entregas já
+  // vinculadas a ele (em vez de carregar o que ficou acumulado localmente).
   useEffect(() => {
     if (!entregador) {
       return;
     }
 
-    let cancelado = false;
-
-    localDb.listarEntregasPendentes(entregador.codigo).then(pendentes => {
-      if (!cancelado) {
-        setEntregas(pendentes);
-      }
-    });
-
-    return () => {
-      cancelado = true;
-    };
-  }, [entregador]);
-
-  const adicionarEntrega = useCallback(
-    async (entrega: Entrega): Promise<'ADICIONADA' | 'DUPLICADA'> => {
-      if (!entregador) {
-        return 'DUPLICADA';
-      }
-
-      const resultado = await localDb.salvarEntregaBipada(entregador.codigo, entrega);
-
-      if (resultado === 'ADICIONADA') {
-        setEntregas(atual => [...atual, entrega]);
-      }
-
-      return resultado;
-    },
-    [entregador],
-  );
+    recarregarEntregas().catch(() => undefined);
+  }, [entregador, recarregarEntregas]);
 
   const confirmarEntregaLocal = useCallback(
     async (codigo: string, formaPagamento: FormaPagamento, valor: number): Promise<void> => {
@@ -127,7 +124,7 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
       entregas,
       selecionarEntregador,
       encerrarSessao,
-      adicionarEntrega,
+      recarregarEntregas,
       confirmarEntregaLocal,
       entregaEmFoco,
       focarEntregaNoMapa,
@@ -137,7 +134,7 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
       entregas,
       selecionarEntregador,
       encerrarSessao,
-      adicionarEntrega,
+      recarregarEntregas,
       confirmarEntregaLocal,
       entregaEmFoco,
       focarEntregaNoMapa,

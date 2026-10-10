@@ -246,11 +246,12 @@ export function MapaEntregaScreen(_props: Props) {
               variante="secundario"
               icone={mostrandoTodas ? 'target' : 'map-marker-multiple-outline'}
               onPress={mostrandoTodas ? handleFocarProxima : () => setMostrandoTodas(true)}
+              compacto
               style={styles.botaoSecundarioFlex}
             />
           </View>
 
-          <BotaoGrande titulo="Abrir no Google Maps" onPress={handleAbrirGoogleMaps} />
+          <BotaoGrande titulo="Abrir no Google Maps" onPress={handleAbrirGoogleMaps} compacto />
 
           {entregasPendentes.length > 1 && (
             <BotaoGrande
@@ -258,6 +259,7 @@ export function MapaEntregaScreen(_props: Props) {
               variante="secundario"
               icone="routes"
               onPress={handleAbrirRotaCompleta}
+              compacto
             />
           )}
 
@@ -266,6 +268,7 @@ export function MapaEntregaScreen(_props: Props) {
             variante="perigo"
             icone="check-circle-outline"
             onPress={handleMarcarEntregue}
+            compacto
           />
         </View>
       </View>
@@ -305,8 +308,8 @@ const styles = StyleSheet.create({
     right: 16,
     backgroundColor: cores.superficie,
     borderRadius: 16,
-    padding: 16,
-    gap: 10,
+    padding: 12,
+    gap: 6,
     borderWidth: 1,
     borderColor: cores.borda,
     shadowColor: cores.texto,

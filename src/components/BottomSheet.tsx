@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cores } from '../theme/colors';
 
@@ -14,6 +14,11 @@ type BottomSheetProps = {
  * nem `react-native-reanimated`) — evita reintroduzir a dependência de
  * gesture-handler, que já quebrou o build C++ no Windows neste projeto
  * (ver roadmap/01-arquitetura-tecnica.md).
+ *
+ * O conteúdo fica dentro de um `KeyboardAvoidingView` pra subir junto com o
+ * teclado no iOS (lá o `Modal` não redimensiona a tela sozinho como o
+ * Android costuma fazer) — sem isso, campos no fim do sheet ficavam atrás
+ * do teclado.
  */
 export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
@@ -32,10 +37,16 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
         accessibilityRole="button"
         accessibilityLabel="Fechar"
       />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
-        <View style={styles.alca} />
-        {children}
-      </View>
+      <KeyboardAvoidingView
+        style={styles.wrapperTeclado}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        pointerEvents="box-none"
+      >
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.alca} />
+          {children}
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -45,11 +56,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(11,18,32,0.45)',
   },
+  wrapperTeclado: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'flex-end',
+  },
   sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: cores.superficie,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

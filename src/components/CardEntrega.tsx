@@ -25,6 +25,7 @@ export function CardEntrega({ entrega, onAbrirOpcoes }: CardEntregaProps) {
         titulo="Opções"
         variante="secundario"
         onPress={() => onAbrirOpcoes(entrega)}
+        compacto
         style={styles.botaoOpcoes}
       />
     </View>

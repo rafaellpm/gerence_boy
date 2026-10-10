@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Entrega, FormaPagamento } from '../services';
 import { cores } from '../theme/colors';
@@ -26,6 +26,7 @@ export function FormaPagamentoModal({
 }: FormaPagamentoModalProps) {
   const [formaSelecionada, setFormaSelecionada] = useState<FormaPagamento | null>(null);
   const [digitosValor, setDigitosValor] = useState('');
+  const [tecladoVisivel, setTecladoVisivel] = useState(false);
 
   useEffect(() => {
     if (entrega) {
@@ -34,6 +35,23 @@ export function FormaPagamentoModal({
     }
   }, [entrega]);
 
+  // Só interessa no iOS: é lá que o Modal não redimensiona a tela sozinho,
+  // então o botão flutuante serve de atalho pra confirmar sem precisar
+  // rolar até o fim do sheet por baixo do teclado.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    const mostrar = Keyboard.addListener('keyboardWillShow', () => setTecladoVisivel(true));
+    const esconder = Keyboard.addListener('keyboardWillHide', () => setTecladoVisivel(false));
+
+    return () => {
+      mostrar.remove();
+      esconder.remove();
+    };
+  }, []);
+
   const valor = digitosParaValor(digitosValor);
   const podeConfirmar = !!formaSelecionada && valor > 0 && !confirmando;
 
@@ -41,6 +59,11 @@ export function FormaPagamentoModal({
     if (formaSelecionada && valor > 0) {
       onConfirmar(formaSelecionada, valor);
     }
+  }
+
+  function handleConfirmarEOcultarTeclado() {
+    Keyboard.dismiss();
+    handleConfirmar();
   }
 
   return (
@@ -106,6 +129,18 @@ export function FormaPagamentoModal({
             carregando={confirmando}
             style={styles.botaoConfirmar}
           />
+
+          {tecladoVisivel && (
+            <Pressable
+              style={[styles.fabConfirmar, !podeConfirmar && styles.fabConfirmarDesabilitado]}
+              onPress={handleConfirmarEOcultarTeclado}
+              disabled={!podeConfirmar}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar e ocultar teclado"
+            >
+              <Icon name="check" size={26} color={cores.primariaTexto} />
+            </Pressable>
+          )}
         </>
       )}
     </BottomSheet>
@@ -184,5 +219,24 @@ const styles = StyleSheet.create({
   },
   botaoConfirmar: {
     marginBottom: 4,
+  },
+  fabConfirmar: {
+    position: 'absolute',
+    right: 4,
+    bottom: 76,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: cores.primaria,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: cores.preto,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  fabConfirmarDesabilitado: {
+    opacity: 0.5,
   },
 });

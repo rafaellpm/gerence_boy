@@ -18,6 +18,8 @@ type BotaoGrandeProps = {
   icone?: string;
   carregando?: boolean;
   desabilitado?: boolean;
+  /** Versão menor (altura/fonte/ícone reduzidos) — para telas com vários botões em pouco espaço, como o cartão de informações do Mapa. */
+  compacto?: boolean;
   style?: ViewStyle;
 };
 
@@ -34,6 +36,7 @@ export function BotaoGrande({
   icone,
   carregando = false,
   desabilitado = false,
+  compacto = false,
   style,
 }: BotaoGrandeProps) {
   const coresVariante = CORES_VARIANTE[variante];
@@ -46,6 +49,7 @@ export function BotaoGrande({
       disabled={inativo}
       style={({ pressed }) => [
         styles.botao,
+        compacto && styles.botaoCompacto,
         { backgroundColor: coresVariante.fundo },
         inativo && styles.desabilitado,
         pressed && !inativo && styles.pressionado,
@@ -57,9 +61,16 @@ export function BotaoGrande({
       ) : (
         <>
           {icone && (
-            <Icon name={icone} size={20} color={coresVariante.texto} style={styles.icone} />
+            <Icon
+              name={icone}
+              size={compacto ? 16 : 20}
+              color={coresVariante.texto}
+              style={styles.icone}
+            />
           )}
-          <Text style={[styles.texto, { color: coresVariante.texto }]}>{titulo}</Text>
+          <Text style={[styles.texto, compacto && styles.textoCompacto, { color: coresVariante.texto }]}>
+            {titulo}
+          </Text>
         </>
       )}
     </Pressable>
@@ -75,12 +86,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
+  botaoCompacto: {
+    minHeight: 40,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+  },
   icone: {
     marginRight: 10,
   },
   texto: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  textoCompacto: {
+    fontSize: 14,
   },
   pressionado: {
     opacity: 0.85,
