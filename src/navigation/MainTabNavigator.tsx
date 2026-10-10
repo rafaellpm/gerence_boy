@@ -13,9 +13,9 @@ import { cores } from '../theme/colors';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const ICONES: Record<keyof MainTabParamList, string> = {
-  MinhasEntregas: 'clipboard-list-outline',
+  Pendentes: 'clipboard-list-outline',
   Mapa: 'map-marker-outline',
-  Pagamentos: 'cash-multiple',
+  Concluidas: 'check-circle-outline',
 };
 
 function TabIcon({ nome, cor, tamanho }: { nome: keyof MainTabParamList; cor: string; tamanho: number }) {
@@ -49,15 +49,15 @@ export function MainTabNavigator({ navigation }: Props) {
         })}
       >
         <Tab.Screen
-          name="MinhasEntregas"
+          name="Pendentes"
           component={ListaEntregasScreen}
-          options={{ title: 'Minhas entregas' }}
+          options={{ title: 'Pendentes' }}
         />
         <Tab.Screen name="Mapa" component={MapaEntregaScreen} options={{ title: 'Mapa' }} />
         <Tab.Screen
-          name="Pagamentos"
+          name="Concluidas"
           component={PagamentosScreen}
-          options={{ title: 'Pagamentos' }}
+          options={{ title: 'Concluídas' }}
         />
       </Tab.Navigator>
     </SairProvider>

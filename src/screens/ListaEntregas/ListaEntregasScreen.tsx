@@ -16,7 +16,7 @@ import { entregaService, Entrega, FormaPagamento } from '../../services';
 import { cores } from '../../theme/colors';
 import { abrirEntregaNoGoogleMaps } from '../../utils/maps';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'MinhasEntregas'>;
+type Props = BottomTabScreenProps<MainTabParamList, 'Pendentes'>;
 
 export function ListaEntregasScreen({ navigation }: Props) {
   const { entregador, entregas, recarregarEntregas, confirmarEntregaLocal, focarEntregaNoMapa } =
@@ -76,6 +76,9 @@ export function ListaEntregasScreen({ navigation }: Props) {
         case 'CODIGO_INVALIDO':
           Alert.alert('Código inválido', `Não foi possível identificar a venda no código ${codigo}.`);
           break;
+        case 'ERRO_AO_VINCULAR':
+          Alert.alert('Erro ao vincular', 'O servidor não conseguiu gravar o vínculo dessa venda. Tente novamente.');
+          break;
       }
     } catch (erro) {
       Alert.alert('Erro ao ler código', erro instanceof Error ? erro.message : String(erro));
@@ -134,7 +137,7 @@ export function ListaEntregasScreen({ navigation }: Props) {
   return (
     <View style={styles.raiz}>
       <AppHeader
-        titulo="Entregas vinculadas"
+        titulo="Entregas Pendentes"
         subtitulo={`${entregas.length} entrega(s)`}
         direita={<SairHeaderButton />}
       />

@@ -14,7 +14,7 @@ import axios from 'axios';
  * parâmetros do servidor em `params` (as rotas Horse recebem tudo via query
  * string, sem corpo JSON).
  */
-export const api = axios.create({ timeout: 8000 });
+export const api = axios.create({ timeout: 15000 });
 
 export function configurarApiBaseUrl(ip: string, porta: string): void {
   api.defaults.baseURL = `http://${ip}:${porta}`;
@@ -76,7 +76,7 @@ export function dataDeHojeServidor(): string {
  * em `api` — por isso não usa a instância `api` (cujo `baseURL` só é
  * definido depois que o teste passa).
  */
-export async function testarConexao(ip: string, porta: string, tempoLimiteMs = 8000): Promise<string | null> {
+export async function testarConexao(ip: string, porta: string, tempoLimiteMs = 15000): Promise<string | null> {
   const url = `http://${ip}:${porta}/ping`;
   try {
     const resposta = await axios.get(url, { timeout: tempoLimiteMs });

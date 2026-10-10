@@ -82,7 +82,13 @@ export async function buscarVendasDoEntregador(idEntregador: string): Promise<En
  * de vincular, só bipa o código e chama essa rota direto.
  */
 type VinculoEntregadorApi = {
-  status: 'VINCULADO' | 'JA_VINCULADO_VOCE' | 'JA_VINCULADO_OUTRO' | 'NAO_ENCONTRADO' | 'CODIGO_INVALIDO';
+  status:
+    | 'VINCULADO'
+    | 'JA_VINCULADO_VOCE'
+    | 'JA_VINCULADO_OUTRO'
+    | 'NAO_ENCONTRADO'
+    | 'CODIGO_INVALIDO'
+    | 'ERRO_AO_VINCULAR';
   entregadorAtual?: string;
   COD_NOTA_VENDA?: string;
   NR_PEDIDO?: string;
@@ -97,7 +103,7 @@ type VinculoEntregadorApi = {
 export type VinculoResultado =
   | { status: 'VINCULADO' | 'JA_VINCULADO_VOCE'; entrega: Entrega }
   | { status: 'JA_VINCULADO_OUTRO'; entregadorAtual: string }
-  | { status: 'NAO_ENCONTRADO' | 'CODIGO_INVALIDO' };
+  | { status: 'NAO_ENCONTRADO' | 'CODIGO_INVALIDO' | 'ERRO_AO_VINCULAR' };
 
 function mapearVinculo(venda: VinculoEntregadorApi): Entrega {
   return {

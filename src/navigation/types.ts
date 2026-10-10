@@ -6,7 +6,7 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
-  MinhasEntregas: undefined;
+  Pendentes: undefined;
   Mapa: undefined;
-  Pagamentos: undefined;
+  Concluidas: undefined;
 };

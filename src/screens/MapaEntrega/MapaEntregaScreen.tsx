@@ -1,7 +1,7 @@
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { Camera, CameraRef, Map, Marker } from '@maplibre/maplibre-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/AppHeader';
@@ -47,6 +47,7 @@ export function MapaEntregaScreen(_props: Props) {
   const [mostrandoTodas, setMostrandoTodas] = useState(false);
   const [entregaParaPagamento, setEntregaParaPagamento] = useState<Entrega | null>(null);
   const [confirmandoPagamento, setConfirmandoPagamento] = useState(false);
+  const [minimizado, setMinimizado] = useState(false);
 
   const entregasPendentes = entregas.filter(
     item => item.situacao === 'PENDENTE' || item.situacao === 'EM_ROTA',
@@ -231,36 +232,56 @@ export function MapaEntregaScreen(_props: Props) {
         <View style={[styles.cartao, { bottom: insets.bottom + 16 }]}>
           <View style={styles.linhaTitulo}>
             <Text style={styles.pedido}>{entregaAtual.numeroPedido}</Text>
-            {entregasPendentes.length > 1 && (
-              <Text style={styles.contador}>
-                1 de {entregasPendentes.length} paradas
-              </Text>
-            )}
+
+            <View style={styles.acoesTitulo}>
+              {!minimizado && entregasPendentes.length > 1 && (
+                <Text style={styles.contador}>
+                  1 de {entregasPendentes.length} paradas
+                </Text>
+              )}
+              <Pressable
+                onPress={() => setMinimizado(atual => !atual)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={minimizado ? 'Expandir' : 'Minimizar'}
+              >
+                <Icon
+                  name={minimizado ? 'chevron-up' : 'chevron-down'}
+                  size={22}
+                  color={cores.textoSecundario}
+                />
+              </Pressable>
+            </View>
           </View>
-          <Text style={styles.cliente}>{entregaAtual.cliente}</Text>
+
+          {!minimizado && <Text style={styles.cliente}>{entregaAtual.cliente}</Text>}
           <Text style={styles.endereco}>{entregaAtual.endereco}</Text>
 
-          <View style={styles.linhaBotoesSecundarios}>
-            <BotaoGrande
-              titulo={mostrandoTodas ? 'Focar na próxima' : 'Ver todas as paradas'}
-              variante="secundario"
-              icone={mostrandoTodas ? 'target' : 'map-marker-multiple-outline'}
-              onPress={mostrandoTodas ? handleFocarProxima : () => setMostrandoTodas(true)}
-              compacto
-              style={styles.botaoSecundarioFlex}
-            />
-          </View>
+          {!minimizado && (
+            <>
+              <View style={styles.linhaBotoesSecundarios}>
+                <BotaoGrande
+                  titulo={mostrandoTodas ? 'Focar na próxima' : 'Ver todas as paradas'}
+                  variante="secundario"
+                  icone={mostrandoTodas ? 'target' : 'map-marker-multiple-outline'}
+                  onPress={mostrandoTodas ? handleFocarProxima : () => setMostrandoTodas(true)}
+                  compacto
+                  style={styles.botaoSecundarioFlex}
+                />
+              </View>
 
-          <BotaoGrande titulo="Abrir no Google Maps" onPress={handleAbrirGoogleMaps} compacto />
+              <BotaoGrande titulo="Abrir no Google Maps" onPress={handleAbrirGoogleMaps} compacto />
 
-          {entregasPendentes.length > 1 && (
-            <BotaoGrande
-              titulo="Abrir rota completa no Google Maps"
-              variante="secundario"
-              icone="routes"
-              onPress={handleAbrirRotaCompleta}
-              compacto
-            />
+              {entregasPendentes.length > 1 && (
+                <BotaoGrande
+                  titulo="Abrir rota completa no Google Maps"
+                  variante="secundario"
+                  icone="routes"
+                  onPress={handleAbrirRotaCompleta}
+                  compacto
+                />
+              )}
+            </>
           )}
 
           <BotaoGrande
@@ -322,6 +343,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  acoesTitulo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   contador: {
     fontSize: 12,

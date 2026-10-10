@@ -4,6 +4,8 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/AppHeader';
+import { BotaoGrande } from '../../components/BotaoGrande';
+import { BottomSheet } from '../../components/BottomSheet';
 import { SairHeaderButton } from '../../components/SairHeaderButton';
 import { SeletorHora } from '../../components/SeletorHora';
 import { useEntregadorContext } from '../../contexts/EntregadorContext';
@@ -14,7 +16,7 @@ import { cores } from '../../theme/colors';
 import { dataIsoDeHoje, formatarDataBr, formatarHoraExibicao, formatarMoeda, somarDias } from '../../utils/dataHora';
 import { FORMAS_PAGAMENTO, iconeFormaPagamento, rotuloFormaPagamento } from '../../utils/formaPagamento';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Pagamentos'>;
+type Props = BottomTabScreenProps<MainTabParamList, 'Concluidas'>;
 
 export function PagamentosScreen(_props: Props) {
   const { entregador } = useEntregadorContext();
@@ -24,6 +26,7 @@ export function PagamentosScreen(_props: Props) {
   const [horaFim, setHoraFim] = useState('');
   const [entregas, setEntregas] = useState<Entrega[]>([]);
   const [carregando, setCarregando] = useState(false);
+  const [filtroAberto, setFiltroAberto] = useState(false);
 
   const carregar = useCallback(() => {
     if (!entregador) {
@@ -56,49 +59,20 @@ export function PagamentosScreen(_props: Props) {
   return (
     <View style={styles.raiz}>
       <AppHeader
-        titulo="Pagamentos"
+        titulo="Concluídas"
         subtitulo={`${entregas.length} entrega(s) · ${formatarMoeda(totalGeral)}`}
         direita={<SairHeaderButton />}
       />
 
       <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-        <View style={styles.filtroData}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setDataIso(atual => somarDias(atual, -1))}
-            style={styles.botaoData}
-          >
-            <Icon name="chevron-left" size={24} color={cores.texto} />
-          </Pressable>
-
-          <View style={styles.dataAtual}>
-            <Text style={styles.dataAtualTexto}>{formatarDataBr(dataIso)}</Text>
-            {dataIso !== dataIsoDeHoje() && (
-              <Pressable accessibilityRole="button" onPress={() => setDataIso(dataIsoDeHoje())}>
-                <Text style={styles.linkHoje}>Voltar para hoje</Text>
-              </Pressable>
-            )}
-          </View>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setDataIso(atual => somarDias(atual, 1))}
-            style={styles.botaoData}
-          >
-            <Icon name="chevron-right" size={24} color={cores.texto} />
-          </Pressable>
-        </View>
-
-        <View style={styles.filtroHorario}>
-          <View style={styles.campoHorario}>
-            <Text style={styles.rotuloHorario}>De</Text>
-            <SeletorHora valor={horaInicio} placeholder="00:00" onAlterar={setHoraInicio} />
-          </View>
-          <View style={styles.campoHorario}>
-            <Text style={styles.rotuloHorario}>Até</Text>
-            <SeletorHora valor={horaFim} placeholder="23:59" onAlterar={setHoraFim} />
-          </View>
-        </View>
+        <Pressable style={styles.botaoFiltro} onPress={() => setFiltroAberto(true)}>
+          <Icon name="filter-variant" size={18} color={cores.texto} />
+          <Text style={styles.botaoFiltroTexto}>
+            {formatarDataBr(dataIso)}
+            {(horaInicio || horaFim) ? ` · ${horaInicio || '00:00'}–${horaFim || '23:59'}` : ''}
+          </Text>
+          <Icon name="chevron-down" size={18} color={cores.textoSecundario} />
+        </Pressable>
 
         {totaisPorForma.length > 0 && (
           <View style={styles.resumo}>
@@ -154,6 +128,54 @@ export function PagamentosScreen(_props: Props) {
             </View>
           )}
         />
+
+        <BottomSheet visible={filtroAberto} onClose={() => setFiltroAberto(false)}>
+          <Text style={styles.tituloFiltro}>Filtrar período</Text>
+
+          <View style={styles.filtroData}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDataIso(atual => somarDias(atual, -1))}
+              style={styles.botaoData}
+            >
+              <Icon name="chevron-left" size={24} color={cores.texto} />
+            </Pressable>
+
+            <View style={styles.dataAtual}>
+              <Text style={styles.dataAtualTexto}>{formatarDataBr(dataIso)}</Text>
+              {dataIso !== dataIsoDeHoje() && (
+                <Pressable accessibilityRole="button" onPress={() => setDataIso(dataIsoDeHoje())}>
+                  <Text style={styles.linkHoje}>Voltar para hoje</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDataIso(atual => somarDias(atual, 1))}
+              style={styles.botaoData}
+            >
+              <Icon name="chevron-right" size={24} color={cores.texto} />
+            </Pressable>
+          </View>
+
+          <View style={styles.filtroHorario}>
+            <View style={styles.campoHorario}>
+              <Text style={styles.rotuloHorario}>De</Text>
+              <SeletorHora valor={horaInicio} placeholder="00:00" onAlterar={setHoraInicio} />
+            </View>
+            <View style={styles.campoHorario}>
+              <Text style={styles.rotuloHorario}>Até</Text>
+              <SeletorHora valor={horaFim} placeholder="23:59" onAlterar={setHoraFim} />
+            </View>
+          </View>
+
+          <BotaoGrande
+            titulo="Concluído"
+            onPress={() => setFiltroAberto(false)}
+            style={styles.botaoConcluirFiltro}
+          />
+        </BottomSheet>
       </SafeAreaView>
     </View>
   );
@@ -168,6 +190,33 @@ const styles = StyleSheet.create({
     backgroundColor: cores.fundo,
     padding: 20,
     gap: 14,
+  },
+  botaoFiltro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: cores.bordaForte,
+    backgroundColor: cores.superficie,
+  },
+  botaoFiltroTexto: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: cores.texto,
+  },
+  tituloFiltro: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: cores.texto,
+    marginBottom: 16,
+  },
+  botaoConcluirFiltro: {
+    marginTop: 8,
+    marginBottom: 4,
   },
   filtroData: {
     flexDirection: 'row',

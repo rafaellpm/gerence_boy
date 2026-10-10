@@ -91,7 +91,12 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
       await localDb.salvarEntregaBipada(entregador.codigo, venda);
     }
 
-    setEntregas(vendas);
+    // Não usa `vendas` direto: o servidor não sabe quais já foram marcadas
+    // como entregues localmente (continuam "em aberto" lá), então a venda
+    // voltaria pra lista a cada atualização. `listarEntregasPendentes` já
+    // exclui as marcadas ENTREGUE no SQLite local.
+    const pendentes = await localDb.listarEntregasPendentes(entregador.codigo);
+    setEntregas(pendentes);
   }, [entregador]);
 
   // Ao identificar o entregador, busca no servidor as entregas já
