@@ -41,13 +41,6 @@ api.interceptors.response.use(undefined, erro => {
  */
 export const CD_EMPRESA = 1;
 
-/**
- * Tipo de pedido "entrega", usado no parâmetro `tipoPedido` da rota
- * `/PedidoNr`. Segue a mesma convenção adotada em outras consultas do
- * servidor (TIPO_MOVIMENTO/TP_PEDIDO = 4 para entrega).
- */
-export const TP_PEDIDO_ENTREGA = 4;
-
 export const ATRASO_SIMULADO_MS = 600;
 
 export function atraso(ms: number = ATRASO_SIMULADO_MS): Promise<void> {

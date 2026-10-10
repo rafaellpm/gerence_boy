@@ -1,12 +1,12 @@
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import React, { useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AppHeader } from '../../components/AppHeader';
 import { BotaoGrande } from '../../components/BotaoGrande';
 import { CardEntrega } from '../../components/CardEntrega';
 import { FormaPagamentoModal } from '../../components/FormaPagamentoModal';
-import { HeaderIconButton } from '../../components/HeaderIconButton';
 import { OpcoesEntregaBottomSheet } from '../../components/OpcoesEntregaBottomSheet';
 import { SairHeaderButton } from '../../components/SairHeaderButton';
 import { ScannerCodigoModal } from '../../components/ScannerCodigoModal';
@@ -19,33 +19,51 @@ import { abrirEntregaNoGoogleMaps } from '../../utils/maps';
 type Props = BottomTabScreenProps<MainTabParamList, 'MinhasEntregas'>;
 
 export function ListaEntregasScreen({ navigation }: Props) {
-  const { entregas, adicionarEntrega, confirmarEntregaLocal, focarEntregaNoMapa } = useEntregadorContext();
+  const { entregador, entregas, adicionarEntrega, confirmarEntregaLocal, focarEntregaNoMapa } = useEntregadorContext();
   const [entregaSelecionada, setEntregaSelecionada] = useState<Entrega | null>(null);
   const [entregaParaPagamento, setEntregaParaPagamento] = useState<Entrega | null>(null);
   const [confirmandoPagamento, setConfirmandoPagamento] = useState(false);
   const [scannerAberto, setScannerAberto] = useState(false);
   const [bipando, setBipando] = useState(false);
 
+  /**
+   * Bipar a venda vincula direto no servidor (PUT), sem consultar antes —
+   * `fVinculaEntregadorPedido` já valida lá se o pedido existe e se já está
+   * vinculado a este ou a outro entregador.
+   */
   async function lerCodigoEntrega(codigo: string) {
     setScannerAberto(false);
+
+    if (!entregador) {
+      return;
+    }
+
     setBipando(true);
 
     try {
-      const entrega = await entregaService.buscarPorCodigo(codigo);
+      const resultado = await entregaService.vincularEntregador(entregador.codigo, codigo);
 
-      if (!entrega) {
-        Alert.alert('Entrega não encontrada', `Código ${codigo} não encontrado.`);
-        return;
+      switch (resultado.status) {
+        case 'VINCULADO':
+        case 'JA_VINCULADO_VOCE': {
+          const adicionado = await adicionarEntrega(resultado.entrega);
+          if (adicionado === 'DUPLICADA') {
+            Alert.alert('Entrega já na lista', `${resultado.entrega.numeroPedido} já está na lista.`);
+          } else {
+            Alert.alert('Entrega vinculada', `${resultado.entrega.numeroPedido} — ${resultado.entrega.cliente}`);
+          }
+          break;
+        }
+        case 'JA_VINCULADO_OUTRO':
+          Alert.alert('Pedido já vinculado', `Esse pedido já está com ${resultado.entregadorAtual}.`);
+          break;
+        case 'NAO_ENCONTRADO':
+          Alert.alert('Pedido não encontrado', `Código ${codigo} não encontrado ou não está mais em aberto.`);
+          break;
+        case 'CODIGO_INVALIDO':
+          Alert.alert('Código inválido', `Não foi possível identificar a venda no código ${codigo}.`);
+          break;
       }
-
-      const resultado = await adicionarEntrega(entrega);
-
-      if (resultado === 'DUPLICADA') {
-        Alert.alert('Entrega já adicionada', `${entrega.numeroPedido} já está na lista.`);
-        return;
-      }
-
-      Alert.alert('Entrega adicionada', `${entrega.numeroPedido} — ${entrega.cliente}`);
     } catch (erro) {
       Alert.alert('Erro ao ler código', erro instanceof Error ? erro.message : String(erro));
     } finally {
@@ -105,12 +123,7 @@ export function ListaEntregasScreen({ navigation }: Props) {
       <AppHeader
         titulo="Entregas vinculadas"
         subtitulo={`${entregas.length} entrega(s)`}
-        direita={
-          <View style={styles.acoesHeader}>
-            <HeaderIconButton icone="camera" onPress={() => setScannerAberto(true)} carregando={bipando} />
-            <SairHeaderButton />
-          </View>
-        }
+        direita={<SairHeaderButton />}
       />
 
       <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
@@ -133,6 +146,19 @@ export function ListaEntregasScreen({ navigation }: Props) {
             <CardEntrega entrega={item} onAbrirOpcoes={setEntregaSelecionada} />
           )}
         />
+
+        <Pressable
+          style={styles.fab}
+          onPress={() => setScannerAberto(true)}
+          disabled={bipando}
+          hitSlop={8}
+        >
+          {bipando ? (
+            <ActivityIndicator color={cores.primariaTexto} />
+          ) : (
+            <Icon name="plus" size={28} color={cores.primariaTexto} />
+          )}
+        </Pressable>
 
         <OpcoesEntregaBottomSheet
           entrega={entregaSelecionada}
@@ -163,16 +189,27 @@ const styles = StyleSheet.create({
   raiz: {
     flex: 1,
   },
-  acoesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
   container: {
     flex: 1,
     backgroundColor: cores.fundo,
     padding: 20,
     gap: 16,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: cores.primaria,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: cores.preto,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   lista: {
     gap: 12,

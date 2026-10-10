@@ -1,10 +1,11 @@
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/AppHeader';
 import { SairHeaderButton } from '../../components/SairHeaderButton';
+import { SeletorHora } from '../../components/SeletorHora';
 import { useEntregadorContext } from '../../contexts/EntregadorContext';
 import { MainTabParamList } from '../../navigation/types';
 import { Entrega } from '../../services';
@@ -15,18 +16,6 @@ import { FORMAS_PAGAMENTO, iconeFormaPagamento, rotuloFormaPagamento } from '../
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Pagamentos'>;
 
-function normalizarHorario(texto: string): string {
-  const digitos = texto.replace(/\D/g, '').slice(0, 4);
-  if (digitos.length <= 2) {
-    return digitos;
-  }
-  return `${digitos.slice(0, 2)}:${digitos.slice(2)}`;
-}
-
-function horarioCompleto(horario: string): boolean {
-  return /^\d{2}:\d{2}$/.test(horario);
-}
-
 export function PagamentosScreen(_props: Props) {
   const { entregador } = useEntregadorContext();
 
@@ -36,26 +25,18 @@ export function PagamentosScreen(_props: Props) {
   const [entregas, setEntregas] = useState<Entrega[]>([]);
   const [carregando, setCarregando] = useState(false);
 
-  const filtroHoraInicioValido = !horaInicio || horarioCompleto(horaInicio);
-  const filtroHoraFimValido = !horaFim || horarioCompleto(horaFim);
-
   const carregar = useCallback(() => {
-    if (!entregador || !filtroHoraInicioValido || !filtroHoraFimValido) {
+    if (!entregador) {
       return;
     }
 
     setCarregando(true);
 
     localDb
-      .listarEntreguesPorDia(
-        entregador.codigo,
-        dataIso,
-        horaInicio && horarioCompleto(horaInicio) ? horaInicio : undefined,
-        horaFim && horarioCompleto(horaFim) ? horaFim : undefined,
-      )
+      .listarEntreguesPorDia(entregador.codigo, dataIso, horaInicio || undefined, horaFim || undefined)
       .then(setEntregas)
       .finally(() => setCarregando(false));
-  }, [entregador, dataIso, horaInicio, horaFim, filtroHoraInicioValido, filtroHoraFimValido]);
+  }, [entregador, dataIso, horaInicio, horaFim]);
 
   useEffect(() => {
     carregar();
@@ -111,27 +92,11 @@ export function PagamentosScreen(_props: Props) {
         <View style={styles.filtroHorario}>
           <View style={styles.campoHorario}>
             <Text style={styles.rotuloHorario}>De</Text>
-            <TextInput
-              style={[styles.inputHorario, !filtroHoraInicioValido && styles.inputHorarioInvalido]}
-              placeholder="00:00"
-              placeholderTextColor={cores.textoPlaceholder}
-              keyboardType="numeric"
-              value={horaInicio}
-              onChangeText={texto => setHoraInicio(normalizarHorario(texto))}
-              maxLength={5}
-            />
+            <SeletorHora valor={horaInicio} placeholder="00:00" onAlterar={setHoraInicio} />
           </View>
           <View style={styles.campoHorario}>
             <Text style={styles.rotuloHorario}>Até</Text>
-            <TextInput
-              style={[styles.inputHorario, !filtroHoraFimValido && styles.inputHorarioInvalido]}
-              placeholder="23:59"
-              placeholderTextColor={cores.textoPlaceholder}
-              keyboardType="numeric"
-              value={horaFim}
-              onChangeText={texto => setHoraFim(normalizarHorario(texto))}
-              maxLength={5}
-            />
+            <SeletorHora valor={horaFim} placeholder="23:59" onAlterar={setHoraFim} />
           </View>
         </View>
 
@@ -238,19 +203,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: cores.textoSecundario,
-  },
-  inputHorario: {
-    borderWidth: 1,
-    borderColor: cores.bordaForte,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: cores.texto,
-    backgroundColor: cores.superficie,
-  },
-  inputHorarioInvalido: {
-    borderColor: cores.perigo,
   },
   resumo: {
     backgroundColor: cores.superficie,

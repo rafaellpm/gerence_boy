@@ -1,83 +1,10 @@
-import { api, CD_EMPRESA, dataDeHojeServidor, TP_PEDIDO_ENTREGA } from './api';
+import { api, CD_EMPRESA, dataDeHojeServidor } from './api';
 import { Entrega, SituacaoEntrega } from './types';
-
-/**
- * Resposta de `GET /PedidoNr` (servidorGerencePlus, uDMNova.fGetPedidoNr /
- * uFuncoesDM.qPedidoNr — consulta em NOTA_VENDA). Todo campo vem como
- * string, mesmo os numéricos.
- *
- * Importante: essa consulta só traz dados financeiros do pedido — não faz
- * JOIN com PESSOAS nem FUNCIONARIO, então não há nome/endereço do cliente
- * nem entregador na resposta. Quando o pedido não é encontrado, o servidor
- * não retorna 404: ele devolve o mesmo formato de objeto com todos os
- * campos vazios (o dataset fica sem registros, mas o código do servidor
- * lê os campos do cursor do mesmo jeito).
- */
-type PedidoNrApi = {
-  COD_NOTA_VENDA: string;
-  ID_CLIENTE: string;
-  TP_PEDIDO: string;
-  NR_PEDIDO: string;
-  DS_DESCRICAO: string;
-  TP_SITUACAOPEDIDO: string;
-  DS_LOCAL: string;
-  DATA_EMISSAO: string;
-  HORA_EMISSAO: string;
-  VALOR_TOTAL: string;
-  VL_PAGAR: string;
-  [campo: string]: string | undefined;
-};
-
-/**
- * TP_SITUACAOPEDIDO só distingue "pendente" ('P') de outra situação em
- * aberto — a rota filtra para só trazer pedidos em P/L e não cancelados,
- * então qualquer coisa fora de 'P' aqui é tratada como já em rota.
- */
-function mapearSituacao(situacao: string): SituacaoEntrega {
-  return situacao === 'P' ? 'PENDENTE' : 'EM_ROTA';
-}
-
-function mapearPedido(codigo: string, pedido: PedidoNrApi): Entrega {
-  return {
-    id: pedido.COD_NOTA_VENDA,
-    codigo,
-    numeroPedido: pedido.NR_PEDIDO,
-    // TODO(api): /PedidoNr não traz nome/endereço do cliente (só dados
-    // financeiros do pedido) — sem rota própria para isso hoje.
-    cliente: `Cliente ${pedido.ID_CLIENTE}`,
-    endereco: '',
-    situacao: mapearSituacao(pedido.TP_SITUACAOPEDIDO),
-  };
-}
-
-/**
- * Consulta uma entrega/pedido pelo código lido no código de barras.
- *
- * Usa `GET /PedidoNr`, única rota viva do servidorGerencePlus que busca um
- * pedido por número — não existe rota dedicada para entrega/delivery.
- */
-export async function buscarPorCodigo(codigo: string): Promise<Entrega | null> {
-  const { data: pedido } = await api.get<PedidoNrApi>('PedidoNr', {
-    params: {
-      empresa: CD_EMPRESA,
-      data: dataDeHojeServidor(),
-      numero: codigo,
-      tipoPedido: TP_PEDIDO_ENTREGA,
-    },
-  });
-
-  if (!pedido.NR_PEDIDO) {
-    return null;
-  }
-
-  return mapearPedido(codigo, pedido);
-}
 
 /**
  * Resposta de `GET /pedido/entregador/:id/pedido` (servidorGerencePlus,
  * uDMNova.fListaVendasEntregador / uFuncoesDM.qCEListaVendasEntregador —
- * NOTA_VENDA + JOIN com PESSOAS/FUNCIONARIO). Ao contrário de `/PedidoNr`,
- * já traz nome/endereço do cliente e dados do entregador vinculado.
+ * NOTA_VENDA + JOIN com PESSOAS/FUNCIONARIO).
  */
 type VendaEntregadorApi = {
   EMPRESA: string;
@@ -149,25 +76,69 @@ export async function buscarVendasDoEntregador(idEntregador: string): Promise<En
 }
 
 /**
- * Vincula o entregador a um pedido e marca como despachado ("saiu para
- * entrega") — mesma ação que o botão de lançar entrega faz na tela de
- * Controle de Entregas do Delphi. Retorna `false` se o pedido não existir
- * ou não estiver mais em aberto (a rota responde 404 nesse caso).
+ * Resposta de `PUT /pedido/entregador/:id/pedido/:idPedido`
+ * (uDMNova.fVinculaEntregadorPedido). O servidor faz toda a validação da
+ * venda (existe? já tem entregador vinculado?) — o app não consulta antes
+ * de vincular, só bipa o código e chama essa rota direto.
+ */
+type VinculoEntregadorApi = {
+  status: 'VINCULADO' | 'JA_VINCULADO_VOCE' | 'JA_VINCULADO_OUTRO' | 'NAO_ENCONTRADO' | 'CODIGO_INVALIDO';
+  entregadorAtual?: string;
+  COD_NOTA_VENDA?: string;
+  NR_PEDIDO?: string;
+  NOME_PESSOA?: string;
+  ENDERECO?: string;
+  NR_LOGRADOURO?: string;
+  DS_LATITUDE?: string;
+  DS_LONGITUDE?: string;
+  [campo: string]: string | undefined;
+};
+
+export type VinculoResultado =
+  | { status: 'VINCULADO' | 'JA_VINCULADO_VOCE'; entrega: Entrega }
+  | { status: 'JA_VINCULADO_OUTRO'; entregadorAtual: string }
+  | { status: 'NAO_ENCONTRADO' | 'CODIGO_INVALIDO' };
+
+function mapearVinculo(venda: VinculoEntregadorApi): Entrega {
+  return {
+    id: venda.COD_NOTA_VENDA ?? '',
+    codigo: venda.NR_PEDIDO ?? '',
+    numeroPedido: venda.NR_PEDIDO ?? '',
+    cliente: venda.NOME_PESSOA ?? '',
+    endereco: [venda.ENDERECO, venda.NR_LOGRADOURO].filter(Boolean).join(', '),
+    latitude: paraNumeroOuUndefined(venda.DS_LATITUDE),
+    longitude: paraNumeroOuUndefined(venda.DS_LONGITUDE),
+    situacao: 'EM_ROTA',
+  };
+}
+
+/**
+ * Vincula o entregador ao pedido lido no código de barras e marca como
+ * despachado ("saiu para entrega"). Sem consulta prévia: o servidor
+ * identifica o pedido pelo código (removendo o prefixo `22222` do código de
+ * barras da venda) e valida tudo — se não existir, ou se já estiver
+ * vinculado a outro entregador, devolve o motivo em `status` sem alterar nada.
  */
 export async function vincularEntregador(
   idEntregador: string,
   idPedido: string,
-): Promise<boolean> {
-  const resposta = await api.put(`pedido/entregador/${idEntregador}/pedido/${idPedido}`, null, {
-    params: { empresa: CD_EMPRESA, data: dataDeHojeServidor() },
-    // A rota devolve "False" + 404 quando o pedido não existe/não está mais em aberto — um "não encontrado" esperado, não erro de transporte.
-    validateStatus: status => (status >= 200 && status < 300) || status === 404,
-  });
-  return resposta.data === 'True';
+): Promise<VinculoResultado> {
+  const { data } = await api.put<VinculoEntregadorApi>(
+    `pedido/entregador/${idEntregador}/pedido/${idPedido}`,
+    null,
+    { params: { empresa: CD_EMPRESA, data: dataDeHojeServidor() } },
+  );
+
+  if (data.status === 'VINCULADO' || data.status === 'JA_VINCULADO_VOCE') {
+    return { status: data.status, entrega: mapearVinculo(data) };
+  }
+  if (data.status === 'JA_VINCULADO_OUTRO') {
+    return { status: data.status, entregadorAtual: data.entregadorAtual ?? 'outro entregador' };
+  }
+  return { status: data.status };
 }
 
 export const entregaService = {
-  buscarPorCodigo,
   buscarVendasDoEntregador,
   vincularEntregador,
 };
