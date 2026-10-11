@@ -19,7 +19,7 @@ import { abrirEntregaNoGoogleMaps } from '../../utils/maps';
 type Props = BottomTabScreenProps<MainTabParamList, 'Pendentes'>;
 
 export function ListaEntregasScreen({ navigation }: Props) {
-  const { entregador, entregas, recarregarEntregas, confirmarEntregaLocal, focarEntregaNoMapa } =
+  const { entregador, entregas, recarregarEntregas, confirmarEntregaLocal, focarEntregaNoMapa, moverEntregaNaLista } =
     useEntregadorContext();
   const [entregaSelecionada, setEntregaSelecionada] = useState<Entrega | null>(null);
   const [entregaParaPagamento, setEntregaParaPagamento] = useState<Entrega | null>(null);
@@ -170,8 +170,13 @@ export function ListaEntregasScreen({ navigation }: Props) {
           ListEmptyComponent={
             <Text style={styles.vazio}>Nenhuma entrega vinculada ainda.</Text>
           }
-          renderItem={({ item }) => (
-            <CardEntrega entrega={item} onAbrirOpcoes={setEntregaSelecionada} />
+          renderItem={({ item, index }) => (
+            <CardEntrega
+              entrega={item}
+              onAbrirOpcoes={setEntregaSelecionada}
+              onSubir={index > 0 ? () => moverEntregaNaLista(item.codigo, 'cima') : undefined}
+              onDescer={index < entregas.length - 1 ? () => moverEntregaNaLista(item.codigo, 'baixo') : undefined}
+            />
           )}
         />
 

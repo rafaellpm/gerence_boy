@@ -52,6 +52,7 @@ export function ScannerCodigoModal({
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
   const jaLeuRef = useRef(false);
+  const candidatoRef = useRef<{ valor: string; vezes: number } | null>(null);
 
   const codeScanner = useCodeScanner({
     codeTypes: TIPOS_DE_CODIGO,
@@ -61,8 +62,20 @@ export function ScannerCodigoModal({
       }
       const valor = codes.find(codigo => !!codigo.value)?.value;
       if (!valor) {
+        candidatoRef.current = null;
         return;
       }
+
+      if (candidatoRef.current?.valor === valor) {
+        candidatoRef.current.vezes += 1;
+      } else {
+        candidatoRef.current = { valor, vezes: 1 };
+      }
+
+      if (candidatoRef.current.vezes < 2) {
+        return;
+      }
+
       jaLeuRef.current = true;
       onCodigoLido(valor);
     },
@@ -73,6 +86,7 @@ export function ScannerCodigoModal({
       return;
     }
     jaLeuRef.current = false;
+    candidatoRef.current = null;
     if (!hasPermission) {
       requestPermission();
     }

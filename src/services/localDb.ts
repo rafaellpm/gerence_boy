@@ -16,6 +16,7 @@ async function adicionarColunasPagamento(): Promise<void> {
     'ALTER TABLE entregas_bipadas ADD COLUMN forma_pagamento TEXT',
     'ALTER TABLE entregas_bipadas ADD COLUMN valor REAL',
     'ALTER TABLE entregas_bipadas ADD COLUMN entregue_em TEXT',
+    'ALTER TABLE entregas_bipadas ADD COLUMN ordem INTEGER',
   ];
 
   for (const sql of alteracoes) {
@@ -177,10 +178,18 @@ export async function salvarEntregaBipada(
     return 'DUPLICADA';
   }
 
+  // Ordem padrão = ordem em que foi bipada: entra sempre depois da última
+  // posição já usada por esse entregador (o usuário pode reordenar depois).
+  const ultimaOrdem = await db.execute(
+    'SELECT COALESCE(MAX(ordem), -1) AS ultima FROM entregas_bipadas WHERE entregador_codigo = ?',
+    [entregadorCodigo],
+  );
+  const proximaOrdem = Number(ultimaOrdem.rows[0]?.ultima ?? -1) + 1;
+
   await db.execute(
     `INSERT INTO entregas_bipadas
-      (entregador_codigo, codigo, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (entregador_codigo, codigo, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, ordem)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       entregadorCodigo,
       entrega.codigo,
@@ -191,6 +200,7 @@ export async function salvarEntregaBipada(
       entrega.longitude ?? null,
       entrega.situacao,
       new Date().toISOString(),
+      proximaOrdem,
     ],
   );
 
@@ -204,11 +214,27 @@ export async function listarEntregasPendentes(entregadorCodigo: string): Promise
   const resultado = await db.execute(
     `SELECT * FROM entregas_bipadas
      WHERE entregador_codigo = ? AND situacao <> 'ENTREGUE'
-     ORDER BY criado_em ASC`,
+     ORDER BY (ordem IS NULL), ordem ASC, criado_em ASC`,
     [entregadorCodigo],
   );
 
   return resultado.rows.map(linhaParaEntrega);
+}
+
+/**
+ * Salva a ordem de exibição das entregas pendentes, a partir da lista de
+ * códigos já na ordem desejada (ex.: depois de mover uma entrega pra cima ou
+ * pra baixo na tela) — persiste no SQLite, então sobrevive a fechar o app.
+ */
+export async function salvarOrdemEntregas(entregadorCodigo: string, codigosEmOrdem: string[]): Promise<void> {
+  await garantirTabela();
+
+  for (let i = 0; i < codigosEmOrdem.length; i++) {
+    await db.execute(
+      'UPDATE entregas_bipadas SET ordem = ? WHERE entregador_codigo = ? AND codigo = ?',
+      [i, entregadorCodigo, codigosEmOrdem[i]],
+    );
+  }
 }
 
 /** Marca a entrega como entregue e grava um ou mais pagamentos pra ela (ex.: parte em dinheiro, parte no cartão). */
@@ -282,6 +308,7 @@ export async function listarEntreguesPorDia(
 export const localDb = {
   salvarEntregaBipada,
   listarEntregasPendentes,
+  salvarOrdemEntregas,
   marcarEntregueLocal,
   listarEntreguesPorDia,
   obterConfiguracaoServidor,

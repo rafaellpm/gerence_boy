@@ -29,6 +29,12 @@ type EntregadorContextValue = {
   /** Marca a entrega como entregue (com um ou mais pagamentos) só no banco local do app (sem chamar a API) e some da listagem. */
   confirmarEntregaLocal: (codigo: string, pagamentos: Pagamento[]) => Promise<void>;
   /**
+   * Move a entrega uma posição pra cima/baixo na lista de pendentes e
+   * persiste a nova ordem no SQLite local — por padrão a ordem é a de
+   * quando foi bipada, mas o entregador pode reorganizar manualmente.
+   */
+  moverEntregaNaLista: (codigo: string, direcao: 'cima' | 'baixo') => Promise<void>;
+  /**
    * Entrega escolhida para exibir na aba "Mapa". Necessário porque a aba faz
    * parte do bottom tab navigator e não recebe parâmetros de rota ao ser
    * selecionada pela barra de abas.
@@ -119,6 +125,28 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
     [entregador],
   );
 
+  const moverEntregaNaLista = useCallback(
+    async (codigo: string, direcao: 'cima' | 'baixo'): Promise<void> => {
+      if (!entregador) {
+        return;
+      }
+
+      const indiceAtual = entregas.findIndex(item => item.codigo === codigo);
+      const indiceNovo = direcao === 'cima' ? indiceAtual - 1 : indiceAtual + 1;
+
+      if (indiceAtual < 0 || indiceNovo < 0 || indiceNovo >= entregas.length) {
+        return;
+      }
+
+      const reordenadas = [...entregas];
+      [reordenadas[indiceAtual], reordenadas[indiceNovo]] = [reordenadas[indiceNovo], reordenadas[indiceAtual]];
+
+      setEntregas(reordenadas);
+      await localDb.salvarOrdemEntregas(entregador.codigo, reordenadas.map(item => item.codigo));
+    },
+    [entregador, entregas],
+  );
+
   const value = useMemo<EntregadorContextValue>(
     () => ({
       entregador,
@@ -127,6 +155,7 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
       encerrarSessao,
       recarregarEntregas,
       confirmarEntregaLocal,
+      moverEntregaNaLista,
       entregaEmFoco,
       focarEntregaNoMapa,
     }),
@@ -137,6 +166,7 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
       encerrarSessao,
       recarregarEntregas,
       confirmarEntregaLocal,
+      moverEntregaNaLista,
       entregaEmFoco,
       focarEntregaNoMapa,
     ],
