@@ -1,7 +1,17 @@
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { Camera, CameraRef, Map, Marker, UserLocation } from '@maplibre/maplibre-react-native';
+import {
+  Camera,
+  CameraRef,
+  GeoJSONSource,
+  Layer,
+  LocationManager,
+  Map,
+  Marker,
+  useCurrentPosition,
+  UserLocation,
+} from '@maplibre/maplibre-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/AppHeader';
@@ -11,6 +21,7 @@ import { SairHeaderButton } from '../../components/SairHeaderButton';
 import { useEntregadorContext } from '../../contexts/EntregadorContext';
 import { MainTabParamList } from '../../navigation/types';
 import { geocodificarEndereco } from '../../services/geocodingService';
+import { buscarRota } from '../../services/rotaService';
 import { Entrega, Pagamento } from '../../services';
 import { cores } from '../../theme/colors';
 import { abrirEntregaNoGoogleMaps, abrirRotaCompletaNoGoogleMaps } from '../../utils/maps';
@@ -49,18 +60,13 @@ export function MapaEntregaScreen(_props: Props) {
   const [confirmandoPagamento, setConfirmandoPagamento] = useState(false);
   const [minimizado, setMinimizado] = useState(false);
   const [mapaPronto, setMapaPronto] = useState(false);
-  const [permissaoLocalizacao, setPermissaoLocalizacao] = useState(Platform.OS === 'ios');
+  const [permissaoLocalizacao, setPermissaoLocalizacao] = useState(false);
+  const [rotaAtual, setRotaAtual] = useState<GeoJSON.LineString | null>(null);
 
-  // No Android a permissão precisa ser pedida em tempo de execução; no iOS
-  // o próprio UserLocation nativo já dispara o prompt do sistema sozinho.
+  const posicaoAtual = useCurrentPosition();
+
   useEffect(() => {
-    if (Platform.OS !== 'android') {
-      return;
-    }
-
-    PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION).then(resultado => {
-      setPermissaoLocalizacao(resultado === PermissionsAndroid.RESULTS.GRANTED);
-    });
+    LocationManager.requestPermissions().then(setPermissaoLocalizacao);
   }, []);
 
   const entregasPendentes = entregas.filter(
@@ -114,6 +120,34 @@ export function MapaEntregaScreen(_props: Props) {
   // entregue) o mapa avança automaticamente pra próxima parada.
   const latitudeAtual = coordenadaAtual?.latitude;
   const longitudeAtual = coordenadaAtual?.longitude;
+
+  const latitudeEntregador = posicaoAtual?.coords.latitude;
+  const longitudeEntregador = posicaoAtual?.coords.longitude;
+
+  // Traça o caminho (via OSRM) da posição atual do entregador até a parada
+  // em foco — só uma prévia visual, a navegação de verdade segue pelo botão
+  // "Abrir no Google Maps".
+  useEffect(() => {
+    if (latitudeEntregador == null || longitudeEntregador == null || latitudeAtual == null || longitudeAtual == null) {
+      setRotaAtual(null);
+      return;
+    }
+
+    let cancelado = false;
+
+    buscarRota(
+      { latitude: latitudeEntregador, longitude: longitudeEntregador },
+      { latitude: latitudeAtual, longitude: longitudeAtual },
+    ).then(rota => {
+      if (!cancelado) {
+        setRotaAtual(rota);
+      }
+    });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [latitudeEntregador, longitudeEntregador, latitudeAtual, longitudeAtual]);
 
   // O <Map> só monta quando há algum ponto geocodificado — se isso some
   // (ex.: lista esvaziou) e volta depois, é um `<Map>` novo, que precisa
@@ -236,6 +270,17 @@ export function MapaEntregaScreen(_props: Props) {
             <Camera ref={cameraRef} initialViewState={{ zoom: ZOOM_FOCO }} />
 
             {permissaoLocalizacao && <UserLocation />}
+
+            {rotaAtual && (
+              <GeoJSONSource id="rota-entregador" data={rotaAtual}>
+                <Layer
+                  type="line"
+                  id="rota-entregador-linha"
+                  layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+                  paint={{ 'line-color': cores.primaria, 'line-width': 4, 'line-opacity': 0.75 }}
+                />
+              </GeoJSONSource>
+            )}
 
             {pontos.map(({ entrega, coordenada }) => {
               const emFoco = entrega.codigo === entregaAtual.codigo;

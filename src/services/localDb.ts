@@ -169,42 +169,37 @@ export async function salvarEntregaBipada(
 ): Promise<'ADICIONADA' | 'DUPLICADA'> {
   await garantirTabela();
 
-  const existente = await db.execute(
-    'SELECT 1 FROM entregas_bipadas WHERE entregador_codigo = ? AND codigo = ?',
-    [entregadorCodigo, entrega.codigo],
-  );
+  let adicionada = false;
 
-  if (existente.rows.length > 0) {
-    return 'DUPLICADA';
-  }
+  await db.transaction(async tx => {
+    const ultimaOrdem = await tx.execute(
+      'SELECT COALESCE(MAX(ordem), -1) AS ultima FROM entregas_bipadas WHERE entregador_codigo = ?',
+      [entregadorCodigo],
+    );
+    const proximaOrdem = Number(ultimaOrdem.rows[0]?.ultima ?? -1) + 1;
 
-  // Ordem padrão = ordem em que foi bipada: entra sempre depois da última
-  // posição já usada por esse entregador (o usuário pode reordenar depois).
-  const ultimaOrdem = await db.execute(
-    'SELECT COALESCE(MAX(ordem), -1) AS ultima FROM entregas_bipadas WHERE entregador_codigo = ?',
-    [entregadorCodigo],
-  );
-  const proximaOrdem = Number(ultimaOrdem.rows[0]?.ultima ?? -1) + 1;
+    const resultado = await tx.execute(
+      `INSERT OR IGNORE INTO entregas_bipadas
+        (entregador_codigo, codigo, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, ordem)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        entregadorCodigo,
+        entrega.codigo,
+        entrega.numeroPedido,
+        entrega.cliente,
+        entrega.endereco,
+        entrega.latitude ?? null,
+        entrega.longitude ?? null,
+        entrega.situacao,
+        new Date().toISOString(),
+        proximaOrdem,
+      ],
+    );
 
-  await db.execute(
-    `INSERT INTO entregas_bipadas
-      (entregador_codigo, codigo, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, ordem)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      entregadorCodigo,
-      entrega.codigo,
-      entrega.numeroPedido,
-      entrega.cliente,
-      entrega.endereco,
-      entrega.latitude ?? null,
-      entrega.longitude ?? null,
-      entrega.situacao,
-      new Date().toISOString(),
-      proximaOrdem,
-    ],
-  );
+    adicionada = resultado.rowsAffected > 0;
+  });
 
-  return 'ADICIONADA';
+  return adicionada ? 'ADICIONADA' : 'DUPLICADA';
 }
 
 /** Entregas ainda "pra entrega" do entregador — exclui as já marcadas como ENTREGUE localmente. */
@@ -247,20 +242,22 @@ export async function marcarEntregueLocal(
 
   const agora = dataHoraLocalIso();
 
-  for (const pagamento of pagamentos) {
-    await db.execute(
-      `INSERT INTO entregas_pagamentos (entregador_codigo, codigo, forma_pagamento, valor, criado_em)
-       VALUES (?, ?, ?, ?, ?)`,
-      [entregadorCodigo, codigo, pagamento.formaPagamento, pagamento.valor, agora],
-    );
-  }
+  await db.transaction(async tx => {
+    for (const pagamento of pagamentos) {
+      await tx.execute(
+        `INSERT INTO entregas_pagamentos (entregador_codigo, codigo, forma_pagamento, valor, criado_em)
+         VALUES (?, ?, ?, ?, ?)`,
+        [entregadorCodigo, codigo, pagamento.formaPagamento, pagamento.valor, agora],
+      );
+    }
 
-  await db.execute(
-    `UPDATE entregas_bipadas
-     SET situacao = 'ENTREGUE', entregue_em = ?
-     WHERE entregador_codigo = ? AND codigo = ?`,
-    [agora, entregadorCodigo, codigo],
-  );
+    await tx.execute(
+      `UPDATE entregas_bipadas
+       SET situacao = 'ENTREGUE', entregue_em = ?
+       WHERE entregador_codigo = ? AND codigo = ?`,
+      [agora, entregadorCodigo, codigo],
+    );
+  });
 }
 
 async function listarPagamentosDaEntrega(entregadorCodigo: string, codigo: string): Promise<Pagamento[]> {
