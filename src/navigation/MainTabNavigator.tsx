@@ -25,15 +25,20 @@ function TabIcon({ nome, cor, tamanho }: { nome: keyof MainTabParamList; cor: st
 type Props = NativeStackScreenProps<RootStackParamList, 'MainTabs'>;
 
 export function MainTabNavigator({ navigation }: Props) {
-  const { encerrarSessao } = useEntregadorContext();
+  const { encerrarSessao, limparVendasLocais } = useEntregadorContext();
 
   const sair = useCallback(() => {
     encerrarSessao();
     navigation.reset({ index: 0, routes: [{ name: 'IdentificarEntregador' }] });
   }, [encerrarSessao, navigation]);
 
+  const limparDadosDeVendas = useCallback(async () => {
+    await limparVendasLocais();
+    sair();
+  }, [limparVendasLocais, sair]);
+
   return (
-    <SairProvider value={sair}>
+    <SairProvider value={{ sair, limparDadosDeVendas }}>
       <Tab.Navigator
         screenOptions={({ route }) => ({
           // Header nativo desativado em todas as abas — cada tela usa o

@@ -5,12 +5,20 @@ import { cores } from '../theme/colors';
 type HeaderTextButtonProps = {
   titulo: string;
   onPress: () => void;
+  onLongPress?: () => void;
+  delayLongPress?: number;
   destrutivo?: boolean;
 };
 
-export function HeaderTextButton({ titulo, onPress, destrutivo = false }: HeaderTextButtonProps) {
+export function HeaderTextButton({
+  titulo,
+  onPress,
+  onLongPress,
+  delayLongPress,
+  destrutivo = false,
+}: HeaderTextButtonProps) {
   return (
-    <Pressable onPress={onPress} hitSlop={12}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={delayLongPress} hitSlop={12}>
       <Text style={[styles.texto, destrutivo && styles.textoDestrutivo]}>{titulo}</Text>
     </Pressable>
   );

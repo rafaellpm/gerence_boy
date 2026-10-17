@@ -19,6 +19,8 @@ type EntregadorContextValue = {
    */
   selecionarEntregador: (entregador: Entregador, permanecerLogado?: boolean) => void;
   encerrarSessao: () => void;
+  /** Apaga todas as entregas e pagamentos salvos no SQLite local (mantém a configuração do servidor) e esvazia a listagem em memória. */
+  limparVendasLocais: () => Promise<void>;
   /**
    * Busca no servidor as vendas de entrega já vinculadas a este entregador
    * e substitui `entregas` pelo que veio de lá (não acumula localmente) —
@@ -72,6 +74,12 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
     setEntregas([]);
     setEntregaEmFoco(null);
     localDb.removerEntregadorPermanente().catch(() => undefined);
+  }, []);
+
+  const limparVendasLocais = useCallback(async (): Promise<void> => {
+    await localDb.limparVendasLocais();
+    setEntregas([]);
+    setEntregaEmFoco(null);
   }, []);
 
   const focarEntregaNoMapa = useCallback((entrega: Entrega | null) => {
@@ -153,6 +161,7 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
       entregas,
       selecionarEntregador,
       encerrarSessao,
+      limparVendasLocais,
       recarregarEntregas,
       confirmarEntregaLocal,
       moverEntregaNaLista,
@@ -164,6 +173,7 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
       entregas,
       selecionarEntregador,
       encerrarSessao,
+      limparVendasLocais,
       recarregarEntregas,
       confirmarEntregaLocal,
       moverEntregaNaLista,

@@ -302,12 +302,23 @@ export async function listarEntreguesPorDia(
   return entregas;
 }
 
+/** Apaga todas as entregas e pagamentos salvos localmente (de qualquer entregador) — mantém a configuração do servidor (IP/porta/terminal) intacta. */
+export async function limparVendasLocais(): Promise<void> {
+  await garantirTabela();
+
+  await db.transaction(async tx => {
+    await tx.execute('DELETE FROM entregas_pagamentos');
+    await tx.execute('DELETE FROM entregas_bipadas');
+  });
+}
+
 export const localDb = {
   salvarEntregaBipada,
   listarEntregasPendentes,
   salvarOrdemEntregas,
   marcarEntregueLocal,
   listarEntreguesPorDia,
+  limparVendasLocais,
   obterConfiguracaoServidor,
   salvarConfiguracaoServidor,
   obterTerminal,

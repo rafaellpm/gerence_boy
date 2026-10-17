@@ -4,7 +4,7 @@ import { useSair } from '../navigation/SairContext';
 import { HeaderTextButton } from './HeaderTextButton';
 
 export function SairHeaderButton() {
-  const sair = useSair();
+  const { sair, limparDadosDeVendas } = useSair();
 
   function confirmarSaida() {
     Alert.alert(
@@ -17,5 +17,24 @@ export function SairHeaderButton() {
     );
   }
 
-  return <HeaderTextButton titulo="Sair" onPress={confirmarSaida} destrutivo />;
+  function confirmarLimpezaTotal() {
+    Alert.alert(
+      'Apagar todas as vendas do aparelho',
+      'Isso remove permanentemente todas as entregas e pagamentos salvos neste aparelho, de qualquer entregador. A configuração do servidor é mantida. Essa ação não pode ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Apagar tudo', style: 'destructive', onPress: () => limparDadosDeVendas() },
+      ],
+    );
+  }
+
+  return (
+    <HeaderTextButton
+      titulo="Sair"
+      onPress={confirmarSaida}
+      onLongPress={confirmarLimpezaTotal}
+      delayLongPress={3000}
+      destrutivo
+    />
+  );
 }
