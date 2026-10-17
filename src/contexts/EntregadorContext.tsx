@@ -29,13 +29,13 @@ type EntregadorContextValue = {
    */
   recarregarEntregas: () => Promise<void>;
   /** Marca a entrega como entregue (com um ou mais pagamentos) só no banco local do app (sem chamar a API) e some da listagem. */
-  confirmarEntregaLocal: (codigo: string, pagamentos: Pagamento[]) => Promise<void>;
+  confirmarEntregaLocal: (codigo: string, dataVenda: string, pagamentos: Pagamento[]) => Promise<void>;
   /**
    * Move a entrega uma posição pra cima/baixo na lista de pendentes e
    * persiste a nova ordem no SQLite local — por padrão a ordem é a de
    * quando foi bipada, mas o entregador pode reorganizar manualmente.
    */
-  moverEntregaNaLista: (codigo: string, direcao: 'cima' | 'baixo') => Promise<void>;
+  moverEntregaNaLista: (codigo: string, dataVenda: string, direcao: 'cima' | 'baixo') => Promise<void>;
   /**
    * Entrega escolhida para exibir na aba "Mapa". Necessário porque a aba faz
    * parte do bottom tab navigator e não recebe parâmetros de rota ao ser
@@ -120,26 +120,30 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
   }, [entregador, recarregarEntregas]);
 
   const confirmarEntregaLocal = useCallback(
-    async (codigo: string, pagamentos: Pagamento[]): Promise<void> => {
+    async (codigo: string, dataVenda: string, pagamentos: Pagamento[]): Promise<void> => {
       if (!entregador) {
         return;
       }
 
-      await localDb.marcarEntregueLocal(entregador.codigo, codigo, pagamentos);
+      await localDb.marcarEntregueLocal(entregador.codigo, codigo, dataVenda, pagamentos);
 
-      setEntregas(atual => atual.filter(item => item.codigo !== codigo));
-      setEntregaEmFoco(atual => (atual?.codigo === codigo ? null : atual));
+      setEntregas(atual => atual.filter(item => !(item.codigo === codigo && item.dataVenda === dataVenda)));
+      setEntregaEmFoco(atual =>
+        atual?.codigo === codigo && atual?.dataVenda === dataVenda ? null : atual,
+      );
     },
     [entregador],
   );
 
   const moverEntregaNaLista = useCallback(
-    async (codigo: string, direcao: 'cima' | 'baixo'): Promise<void> => {
+    async (codigo: string, dataVenda: string, direcao: 'cima' | 'baixo'): Promise<void> => {
       if (!entregador) {
         return;
       }
 
-      const indiceAtual = entregas.findIndex(item => item.codigo === codigo);
+      const indiceAtual = entregas.findIndex(
+        item => item.codigo === codigo && item.dataVenda === dataVenda,
+      );
       const indiceNovo = direcao === 'cima' ? indiceAtual - 1 : indiceAtual + 1;
 
       if (indiceAtual < 0 || indiceNovo < 0 || indiceNovo >= entregas.length) {
@@ -150,7 +154,10 @@ export function EntregadorProvider({ children }: { children: React.ReactNode }) 
       [reordenadas[indiceAtual], reordenadas[indiceNovo]] = [reordenadas[indiceNovo], reordenadas[indiceAtual]];
 
       setEntregas(reordenadas);
-      await localDb.salvarOrdemEntregas(entregador.codigo, reordenadas.map(item => item.codigo));
+      await localDb.salvarOrdemEntregas(
+        entregador.codigo,
+        reordenadas.map(item => ({ codigo: item.codigo, dataVenda: item.dataVenda })),
+      );
     },
     [entregador, entregas],
   );

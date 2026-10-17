@@ -134,7 +134,7 @@ export function ListaEntregasScreen({ navigation }: Props) {
     setConfirmandoPagamento(true);
 
     try {
-      await confirmarEntregaLocal(entregaParaPagamento.codigo, pagamentos);
+      await confirmarEntregaLocal(entregaParaPagamento.codigo, entregaParaPagamento.dataVenda, pagamentos);
       setEntregaParaPagamento(null);
     } catch {
       Alert.alert('Erro ao marcar entrega', 'Não foi possível salvar no banco local do dispositivo.');
@@ -163,7 +163,7 @@ export function ListaEntregasScreen({ navigation }: Props) {
 
         <FlatList
           data={entregas}
-          keyExtractor={item => item.codigo}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.lista}
           refreshing={atualizando}
           onRefresh={handleAtualizar}
@@ -174,8 +174,12 @@ export function ListaEntregasScreen({ navigation }: Props) {
             <CardEntrega
               entrega={item}
               onAbrirOpcoes={setEntregaSelecionada}
-              onSubir={index > 0 ? () => moverEntregaNaLista(item.codigo, 'cima') : undefined}
-              onDescer={index < entregas.length - 1 ? () => moverEntregaNaLista(item.codigo, 'baixo') : undefined}
+              onSubir={index > 0 ? () => moverEntregaNaLista(item.codigo, item.dataVenda, 'cima') : undefined}
+              onDescer={
+                index < entregas.length - 1
+                  ? () => moverEntregaNaLista(item.codigo, item.dataVenda, 'baixo')
+                  : undefined
+              }
             />
           )}
         />

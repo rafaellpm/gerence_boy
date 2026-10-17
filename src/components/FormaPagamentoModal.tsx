@@ -19,6 +19,10 @@ function digitosParaValor(digitos: string): number {
   return Number(digitos || '0') / 100;
 }
 
+function arredondar(valor: number): number {
+  return Math.round(valor * 100) / 100;
+}
+
 /**
  * Confirma a entrega podendo registrar mais de um pagamento pra mesma venda
  * (ex.: parte em dinheiro, parte no cartão) — "+ Adicionar outro pagamento"
@@ -64,9 +68,28 @@ export function FormaPagamentoModal({
   }, []);
 
   const valorAtual = digitosParaValor(digitosValor);
-  const rascunhoValido = !!formaSelecionada && valorAtual > 0;
+
+  const valorTotal = entrega?.valorTotal;
+  const totalAdicionado = pagamentosAdicionados.reduce((soma, item) => soma + item.valor, 0);
+  const restante = valorTotal != null ? arredondar(valorTotal - totalAdicionado) : null;
+
+  // Só dinheiro pode passar do restante (gera troco) — as demais formas têm
+  // que caber exatamente no que falta, sem "troco" de cartão/Pix.
+  const excedeLimite =
+    !!formaSelecionada &&
+    formaSelecionada !== 'DINHEIRO' &&
+    restante != null &&
+    valorAtual > restante + 0.001;
+
+  const trocoAtual =
+    formaSelecionada === 'DINHEIRO' && restante != null && valorAtual > restante
+      ? arredondar(valorAtual - Math.max(restante, 0))
+      : 0;
+  const valorAplicado = arredondar(valorAtual - trocoAtual);
+
+  const rascunhoValido = !!formaSelecionada && valorAtual > 0 && !excedeLimite;
   const pagamentosFinais: Pagamento[] = rascunhoValido
-    ? [...pagamentosAdicionados, { formaPagamento: formaSelecionada!, valor: valorAtual }]
+    ? [...pagamentosAdicionados, { formaPagamento: formaSelecionada!, valor: valorAplicado }]
     : pagamentosAdicionados;
   const totalFinal = pagamentosFinais.reduce((soma, item) => soma + item.valor, 0);
   const podeConfirmar = pagamentosFinais.length > 0 && !confirmando;
@@ -75,7 +98,7 @@ export function FormaPagamentoModal({
     if (!rascunhoValido) {
       return;
     }
-    setPagamentosAdicionados(atual => [...atual, { formaPagamento: formaSelecionada!, valor: valorAtual }]);
+    setPagamentosAdicionados(atual => [...atual, { formaPagamento: formaSelecionada!, valor: valorAplicado }]);
     setFormaSelecionada(null);
     setDigitosValor('');
   }
@@ -106,8 +129,12 @@ export function FormaPagamentoModal({
 
           {entrega.valorTotal != null && (
             <View style={styles.valorVenda}>
-              <Text style={styles.valorVendaRotulo}>Valor a cobrar</Text>
-              <Text style={styles.valorVendaValor}>{formatarMoeda(entrega.valorTotal)}</Text>
+              <Text style={styles.valorVendaRotulo}>
+                {pagamentosAdicionados.length > 0 ? 'Restante' : 'Valor a cobrar'}
+              </Text>
+              <Text style={styles.valorVendaValor}>
+                {formatarMoeda(pagamentosAdicionados.length > 0 ? (restante ?? entrega.valorTotal) : entrega.valorTotal)}
+              </Text>
             </View>
           )}
 
@@ -168,7 +195,7 @@ export function FormaPagamentoModal({
 
           <Text style={styles.rotulo}>Valor recebido</Text>
           <View style={styles.linhaValor}>
-            <View style={styles.campoValor}>
+            <View style={[styles.campoValor, excedeLimite && styles.campoValorErro]}>
               <Text style={styles.prefixoValor}>R$</Text>
               <TextInput
                 style={styles.inputValor}
@@ -191,6 +218,16 @@ export function FormaPagamentoModal({
               <Icon name="plus" size={22} color={cores.primariaTexto} />
             </Pressable>
           </View>
+
+          {excedeLimite && restante != null && (
+            <Text style={styles.mensagemErro}>
+              {rotuloFormaPagamento(formaSelecionada!)} não pode passar de {formatarMoeda(Math.max(restante, 0))}.
+            </Text>
+          )}
+
+          {trocoAtual > 0 && (
+            <Text style={styles.mensagemTroco}>Troco: {formatarMoeda(trocoAtual)}</Text>
+          )}
 
           {pagamentosAdicionados.length > 0 && (
             <Text style={styles.totalGeral}>Total: {formatarMoeda(totalFinal)}</Text>
@@ -328,6 +365,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     backgroundColor: cores.superficie,
+  },
+  campoValorErro: {
+    borderColor: cores.perigo,
+  },
+  mensagemErro: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: cores.perigo,
+    marginTop: -6,
+    marginBottom: 12,
+  },
+  mensagemTroco: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: cores.sucesso,
+    marginTop: -6,
+    marginBottom: 12,
   },
   prefixoValor: {
     fontSize: 18,

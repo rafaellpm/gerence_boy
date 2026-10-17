@@ -86,14 +86,14 @@ export function MapaEntregaScreen(_props: Props) {
         if (cancelado) {
           return;
         }
-        if (coordenadaPropria(entrega) || coordenadasGeocodificadas[entrega.codigo]) {
+        if (coordenadaPropria(entrega) || coordenadasGeocodificadas[entrega.id]) {
           continue;
         }
 
         const resultado = await geocodificarEndereco(entrega.endereco);
 
         if (!cancelado && resultado) {
-          setCoordenadasGeocodificadas(atual => ({ ...atual, [entrega.codigo]: resultado }));
+          setCoordenadasGeocodificadas(atual => ({ ...atual, [entrega.id]: resultado }));
         }
       }
     }
@@ -103,11 +103,11 @@ export function MapaEntregaScreen(_props: Props) {
     return () => {
       cancelado = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só precisa reagir à lista de códigos pendentes
-  }, [entregasPendentes.map(item => item.codigo).join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só precisa reagir à lista de ids pendentes
+  }, [entregasPendentes.map(item => item.id).join(',')]);
 
   function coordenadaDe(entrega: Entrega): Coordenada | null {
-    return coordenadaPropria(entrega) ?? coordenadasGeocodificadas[entrega.codigo] ?? null;
+    return coordenadaPropria(entrega) ?? coordenadasGeocodificadas[entrega.id] ?? null;
   }
 
   const pontos = entregasPendentes
@@ -191,7 +191,7 @@ export function MapaEntregaScreen(_props: Props) {
       { padding: { left: 60, right: 60, top: 80, bottom: 220 }, duration: 700 },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- recalcula só quando a lista de pontos muda
-  }, [mapaPronto, mostrandoTodas, pontos.map(ponto => ponto.entrega.codigo).join(',')]);
+  }, [mapaPronto, mostrandoTodas, pontos.map(ponto => ponto.entrega.id).join(',')]);
 
   function handleFocarProxima() {
     focarEntregaNoMapa(null);
@@ -232,7 +232,7 @@ export function MapaEntregaScreen(_props: Props) {
     setConfirmandoPagamento(true);
 
     try {
-      await confirmarEntregaLocal(entregaParaPagamento.codigo, pagamentos);
+      await confirmarEntregaLocal(entregaParaPagamento.codigo, entregaParaPagamento.dataVenda, pagamentos);
       setEntregaParaPagamento(null);
     } catch {
       Alert.alert('Erro ao marcar entrega', 'Não foi possível salvar no banco local do dispositivo.');
@@ -283,10 +283,10 @@ export function MapaEntregaScreen(_props: Props) {
             )}
 
             {pontos.map(({ entrega, coordenada }) => {
-              const emFoco = entrega.codigo === entregaAtual.codigo;
+              const emFoco = entrega.id === entregaAtual.id;
               return (
                 <Marker
-                  key={entrega.codigo}
+                  key={entrega.id}
                   lngLat={[coordenada.longitude, coordenada.latitude]}
                   onPress={() => focarEntregaNoMapa(entrega)}
                 >

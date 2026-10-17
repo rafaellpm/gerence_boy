@@ -18,6 +18,8 @@ export type Pagamento = {
 export type Entrega = {
   id: string;
   codigo: string;
+  /** Data da venda (yyyy-MM-dd) — NR_PEDIDO reseta diariamente, então a identidade real da venda é (codigo, dataVenda), não só codigo. */
+  dataVenda: string;
   numeroPedido: string;
   cliente: string;
   endereco: string;

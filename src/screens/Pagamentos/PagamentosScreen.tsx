@@ -1,5 +1,6 @@
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,9 +42,14 @@ export function PagamentosScreen(_props: Props) {
       .finally(() => setCarregando(false));
   }, [entregador, dataIso, horaInicio, horaFim]);
 
-  useEffect(() => {
-    carregar();
-  }, [carregar]);
+  // Recarrega sempre que a aba "Concluídas" ganha foco (ex.: voltando de
+  // "Pendentes" depois de confirmar uma entrega) — a lista não é só no mount
+  // porque o bottom tab navigator mantém a tela montada ao trocar de aba.
+  useFocusEffect(
+    useCallback(() => {
+      carregar();
+    }, [carregar]),
+  );
 
   function totalDaEntrega(entrega: Entrega): number {
     return (entrega.pagamentos ?? []).reduce((soma, pagamento) => soma + pagamento.valor, 0);
@@ -98,7 +104,7 @@ export function PagamentosScreen(_props: Props) {
 
         <FlatList
           data={entregas}
-          keyExtractor={item => item.codigo}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.lista}
           refreshing={carregando}
           onRefresh={carregar}

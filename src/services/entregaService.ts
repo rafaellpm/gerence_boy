@@ -1,4 +1,4 @@
-import { api, CD_EMPRESA, dataDeHojeServidor } from './api';
+import { api, CD_EMPRESA, dataDeHojeIso, dataDeHojeServidor } from './api';
 import { Entrega, SituacaoEntrega } from './types';
 
 /**
@@ -53,6 +53,7 @@ function mapearVenda(venda: VendaEntregadorApi): Entrega {
   return {
     id: venda.COD_NOTA_VENDA,
     codigo: venda.NR_PEDIDO,
+    dataVenda: dataDeHojeIso(),
     numeroPedido: venda.NR_PEDIDO,
     cliente: venda.NOME_PESSOA,
     endereco: [venda.ENDERECO, venda.NR_LOGRADOURO].filter(Boolean).join(', '),
@@ -111,6 +112,7 @@ function mapearVinculo(venda: VinculoEntregadorApi): Entrega {
   return {
     id: venda.COD_NOTA_VENDA ?? '',
     codigo: venda.NR_PEDIDO ?? '',
+    dataVenda: dataDeHojeIso(),
     numeroPedido: venda.NR_PEDIDO ?? '',
     cliente: venda.NOME_PESSOA ?? '',
     endereco: [venda.ENDERECO, venda.NR_LOGRADOURO].filter(Boolean).join(', '),

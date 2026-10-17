@@ -26,6 +26,67 @@ async function adicionarColunasPagamento(): Promise<void> {
   }
 }
 
+/**
+ * NR_PEDIDO (codigo) reseta diariamente — a chave original só tinha
+ * (entregador_codigo, codigo), então o pedido 45 de hoje colidia com o
+ * pedido 45 de ontem. Recria a tabela com (entregador_codigo, codigo,
+ * data_venda) como chave, preenchendo data_venda das linhas antigas a
+ * partir da data de criado_em (instalações novas já criam a tabela certa,
+ * então isso vira um no-op).
+ */
+async function migrarChavePrimariaComData(): Promise<void> {
+  const colunas = await db.execute('PRAGMA table_info(entregas_bipadas)');
+  const temDataVenda = colunas.rows.some(coluna => coluna.name === 'data_venda');
+
+  if (temDataVenda) {
+    return;
+  }
+
+  await db.transaction(async tx => {
+    await tx.execute('ALTER TABLE entregas_bipadas RENAME TO entregas_bipadas_old');
+
+    await tx.execute(
+      `CREATE TABLE entregas_bipadas (
+        entregador_codigo TEXT NOT NULL,
+        codigo TEXT NOT NULL,
+        data_venda TEXT NOT NULL,
+        numero_pedido TEXT NOT NULL,
+        cliente TEXT NOT NULL,
+        endereco TEXT NOT NULL,
+        latitude REAL,
+        longitude REAL,
+        situacao TEXT NOT NULL,
+        criado_em TEXT NOT NULL,
+        forma_pagamento TEXT,
+        valor REAL,
+        entregue_em TEXT,
+        ordem INTEGER,
+        PRIMARY KEY (entregador_codigo, codigo, data_venda)
+      )`,
+    );
+
+    await tx.execute(
+      `INSERT OR IGNORE INTO entregas_bipadas
+        (entregador_codigo, codigo, data_venda, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, forma_pagamento, valor, entregue_em, ordem)
+       SELECT entregador_codigo, codigo, substr(criado_em, 1, 10), numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, forma_pagamento, valor, entregue_em, ordem
+       FROM entregas_bipadas_old`,
+    );
+
+    await tx.execute('DROP TABLE entregas_bipadas_old');
+  });
+}
+
+/** Mesma lógica da migração acima, mas pra entregas_pagamentos (sem PK — só ADD COLUMN + backfill). */
+async function adicionarColunaDataVendaPagamentos(): Promise<void> {
+  try {
+    await db.execute('ALTER TABLE entregas_pagamentos ADD COLUMN data_venda TEXT');
+  } catch {}
+
+  await db.execute(
+    `UPDATE entregas_pagamentos SET data_venda = substr(criado_em, 1, 10) WHERE data_venda IS NULL`,
+  );
+}
+
 function garantirTabela(): Promise<void> {
   if (!tabelaPronta) {
     tabelaPronta = db
@@ -33,6 +94,7 @@ function garantirTabela(): Promise<void> {
         `CREATE TABLE IF NOT EXISTS entregas_bipadas (
           entregador_codigo TEXT NOT NULL,
           codigo TEXT NOT NULL,
+          data_venda TEXT NOT NULL DEFAULT '',
           numero_pedido TEXT NOT NULL,
           cliente TEXT NOT NULL,
           endereco TEXT NOT NULL,
@@ -43,10 +105,12 @@ function garantirTabela(): Promise<void> {
           forma_pagamento TEXT,
           valor REAL,
           entregue_em TEXT,
-          PRIMARY KEY (entregador_codigo, codigo)
+          ordem INTEGER,
+          PRIMARY KEY (entregador_codigo, codigo, data_venda)
         )`,
       )
       .then(() => adicionarColunasPagamento())
+      .then(() => migrarChavePrimariaComData())
       .then(() =>
         db.execute(
           `CREATE TABLE IF NOT EXISTS app_config (
@@ -63,12 +127,14 @@ function garantirTabela(): Promise<void> {
           `CREATE TABLE IF NOT EXISTS entregas_pagamentos (
             entregador_codigo TEXT NOT NULL,
             codigo TEXT NOT NULL,
+            data_venda TEXT NOT NULL DEFAULT '',
             forma_pagamento TEXT NOT NULL,
             valor REAL NOT NULL,
             criado_em TEXT NOT NULL
           )`,
         ),
       )
+      .then(() => adicionarColunaDataVendaPagamentos())
       .then(() => undefined);
   }
   return tabelaPronta;
@@ -146,8 +212,9 @@ export async function removerEntregadorPermanente(): Promise<void> {
 
 function linhaParaEntrega(linha: Record<string, unknown>): Entrega {
   return {
-    id: `${linha.entregador_codigo}:${linha.codigo}`,
+    id: `${linha.entregador_codigo}:${linha.codigo}:${linha.data_venda}`,
     codigo: String(linha.codigo),
+    dataVenda: String(linha.data_venda),
     numeroPedido: String(linha.numero_pedido),
     cliente: String(linha.cliente),
     endereco: String(linha.endereco),
@@ -180,11 +247,12 @@ export async function salvarEntregaBipada(
 
     const resultado = await tx.execute(
       `INSERT OR IGNORE INTO entregas_bipadas
-        (entregador_codigo, codigo, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, ordem)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (entregador_codigo, codigo, data_venda, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, ordem)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         entregadorCodigo,
         entrega.codigo,
+        entrega.dataVenda,
         entrega.numeroPedido,
         entrega.cliente,
         entrega.endereco,
@@ -218,16 +286,21 @@ export async function listarEntregasPendentes(entregadorCodigo: string): Promise
 
 /**
  * Salva a ordem de exibição das entregas pendentes, a partir da lista de
- * códigos já na ordem desejada (ex.: depois de mover uma entrega pra cima ou
- * pra baixo na tela) — persiste no SQLite, então sobrevive a fechar o app.
+ * (codigo, dataVenda) já na ordem desejada (ex.: depois de mover uma entrega
+ * pra cima ou pra baixo na tela) — persiste no SQLite, então sobrevive a
+ * fechar o app. Precisa de dataVenda junto de codigo porque NR_PEDIDO reseta
+ * diariamente.
  */
-export async function salvarOrdemEntregas(entregadorCodigo: string, codigosEmOrdem: string[]): Promise<void> {
+export async function salvarOrdemEntregas(
+  entregadorCodigo: string,
+  itensEmOrdem: { codigo: string; dataVenda: string }[],
+): Promise<void> {
   await garantirTabela();
 
-  for (let i = 0; i < codigosEmOrdem.length; i++) {
+  for (let i = 0; i < itensEmOrdem.length; i++) {
     await db.execute(
-      'UPDATE entregas_bipadas SET ordem = ? WHERE entregador_codigo = ? AND codigo = ?',
-      [i, entregadorCodigo, codigosEmOrdem[i]],
+      'UPDATE entregas_bipadas SET ordem = ? WHERE entregador_codigo = ? AND codigo = ? AND data_venda = ?',
+      [i, entregadorCodigo, itensEmOrdem[i].codigo, itensEmOrdem[i].dataVenda],
     );
   }
 }
@@ -236,6 +309,7 @@ export async function salvarOrdemEntregas(entregadorCodigo: string, codigosEmOrd
 export async function marcarEntregueLocal(
   entregadorCodigo: string,
   codigo: string,
+  dataVenda: string,
   pagamentos: Pagamento[],
 ): Promise<void> {
   await garantirTabela();
@@ -245,27 +319,31 @@ export async function marcarEntregueLocal(
   await db.transaction(async tx => {
     for (const pagamento of pagamentos) {
       await tx.execute(
-        `INSERT INTO entregas_pagamentos (entregador_codigo, codigo, forma_pagamento, valor, criado_em)
-         VALUES (?, ?, ?, ?, ?)`,
-        [entregadorCodigo, codigo, pagamento.formaPagamento, pagamento.valor, agora],
+        `INSERT INTO entregas_pagamentos (entregador_codigo, codigo, data_venda, forma_pagamento, valor, criado_em)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [entregadorCodigo, codigo, dataVenda, pagamento.formaPagamento, pagamento.valor, agora],
       );
     }
 
     await tx.execute(
       `UPDATE entregas_bipadas
        SET situacao = 'ENTREGUE', entregue_em = ?
-       WHERE entregador_codigo = ? AND codigo = ?`,
-      [agora, entregadorCodigo, codigo],
+       WHERE entregador_codigo = ? AND codigo = ? AND data_venda = ?`,
+      [agora, entregadorCodigo, codigo, dataVenda],
     );
   });
 }
 
-async function listarPagamentosDaEntrega(entregadorCodigo: string, codigo: string): Promise<Pagamento[]> {
+async function listarPagamentosDaEntrega(
+  entregadorCodigo: string,
+  codigo: string,
+  dataVenda: string,
+): Promise<Pagamento[]> {
   const resultado = await db.execute(
     `SELECT forma_pagamento, valor FROM entregas_pagamentos
-     WHERE entregador_codigo = ? AND codigo = ?
+     WHERE entregador_codigo = ? AND codigo = ? AND data_venda = ?
      ORDER BY criado_em ASC`,
-    [entregadorCodigo, codigo],
+    [entregadorCodigo, codigo, dataVenda],
   );
 
   return resultado.rows.map(linha => ({
@@ -296,7 +374,7 @@ export async function listarEntreguesPorDia(
   const entregas = resultado.rows.map(linhaParaEntrega);
 
   for (const entrega of entregas) {
-    entrega.pagamentos = await listarPagamentosDaEntrega(entregadorCodigo, entrega.codigo);
+    entrega.pagamentos = await listarPagamentosDaEntrega(entregadorCodigo, entrega.codigo, entrega.dataVenda);
   }
 
   return entregas;
