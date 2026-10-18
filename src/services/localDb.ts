@@ -345,12 +345,20 @@ export async function marcarEntregueLocal(
   const agora = dataHoraLocalIso();
 
   await db.transaction(async tx => {
-    for (const pagamento of pagamentos) {
-      await tx.execute(
-        `INSERT INTO entregas_pagamentos (entregador_codigo, codigo, data_venda, forma_pagamento, valor, criado_em)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [entregadorCodigo, codigo, dataVenda, pagamento.formaPagamento, pagamento.valor, agora],
-      );
+    const jaTemPagamento = await tx.execute(
+      `SELECT 1 FROM entregas_pagamentos
+       WHERE entregador_codigo = ? AND codigo = ? AND data_venda = ? LIMIT 1`,
+      [entregadorCodigo, codigo, dataVenda],
+    );
+
+    if (jaTemPagamento.rows.length === 0) {
+      for (const pagamento of pagamentos) {
+        await tx.execute(
+          `INSERT INTO entregas_pagamentos (entregador_codigo, codigo, data_venda, forma_pagamento, valor, criado_em)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [entregadorCodigo, codigo, dataVenda, pagamento.formaPagamento, pagamento.valor, agora],
+        );
+      }
     }
 
     await tx.execute(
