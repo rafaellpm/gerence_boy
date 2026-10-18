@@ -5,50 +5,39 @@ import { Entrega } from '../services';
 import { cores } from '../theme/colors';
 import { formatarMoeda } from '../utils/dataHora';
 import { BadgeSituacao } from './BadgeSituacao';
-import { BotaoGrande } from './BotaoGrande';
 
 type CardEntregaProps = {
   entrega: Entrega;
-  onAbrirOpcoes: (entrega: Entrega) => void;
+  onPress: (entrega: Entrega) => void;
   /** Setas de reordenar — omitidas se não houver pra onde mover (primeiro/último item ou lista com 1 entrega). */
   onSubir?: () => void;
   onDescer?: () => void;
 };
 
-export function CardEntrega({ entrega, onAbrirOpcoes, onSubir, onDescer }: CardEntregaProps) {
+export function CardEntrega({ entrega, onPress, onSubir, onDescer }: CardEntregaProps) {
   return (
     <View style={styles.card}>
-      <View style={styles.linha}>
-        <View style={styles.setas}>
-          <Pressable onPress={onSubir} disabled={!onSubir} hitSlop={8} accessibilityLabel="Mover pra cima">
-            <Icon name="chevron-up" size={22} color={onSubir ? cores.texto : cores.textoPlaceholder} />
-          </Pressable>
-          <Pressable onPress={onDescer} disabled={!onDescer} hitSlop={8} accessibilityLabel="Mover pra baixo">
-            <Icon name="chevron-down" size={22} color={onDescer ? cores.texto : cores.textoPlaceholder} />
-          </Pressable>
-        </View>
-
-        <View style={styles.conteudo}>
-          <View style={styles.cabecalho}>
-            <Text style={styles.pedido}>{entrega.numeroPedido}</Text>
-            <BadgeSituacao situacao={entrega.situacao} />
-          </View>
-
-          <Text style={styles.cliente}>{entrega.cliente}</Text>
-          <Text style={styles.endereco}>{entrega.endereco}</Text>
-          {entrega.valorTotal != null && (
-            <Text style={styles.valor}>Valor: {formatarMoeda(entrega.valorTotal)}</Text>
-          )}
-        </View>
+      <View style={styles.setas}>
+        <Pressable onPress={onSubir} disabled={!onSubir} hitSlop={8} accessibilityLabel="Mover pra cima">
+          <Icon name="chevron-up" size={22} color={onSubir ? cores.texto : cores.textoPlaceholder} />
+        </Pressable>
+        <Pressable onPress={onDescer} disabled={!onDescer} hitSlop={8} accessibilityLabel="Mover pra baixo">
+          <Icon name="chevron-down" size={22} color={onDescer ? cores.texto : cores.textoPlaceholder} />
+        </Pressable>
       </View>
 
-      <BotaoGrande
-        titulo="Opções"
-        variante="secundario"
-        onPress={() => onAbrirOpcoes(entrega)}
-        compacto
-        style={styles.botaoOpcoes}
-      />
+      <Pressable style={styles.conteudo} onPress={() => onPress(entrega)} accessibilityRole="button">
+        <View style={styles.cabecalho}>
+          <Text style={styles.pedido}>{entrega.numeroPedido}</Text>
+          <BadgeSituacao situacao={entrega.situacao} />
+        </View>
+
+        <Text style={styles.cliente}>{entrega.cliente}</Text>
+        <Text style={styles.endereco}>{entrega.endereco}</Text>
+        {entrega.valorTotal != null && (
+          <Text style={styles.valor}>Valor: {formatarMoeda(entrega.valorTotal)}</Text>
+        )}
+      </Pressable>
     </View>
   );
 }
@@ -58,13 +47,10 @@ const styles = StyleSheet.create({
     backgroundColor: cores.superficie,
     borderRadius: 16,
     padding: 16,
-    gap: 8,
+    gap: 12,
+    flexDirection: 'row',
     borderWidth: 1,
     borderColor: cores.borda,
-  },
-  linha: {
-    flexDirection: 'row',
-    gap: 12,
   },
   setas: {
     justifyContent: 'center',
@@ -97,8 +83,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: cores.sucesso,
-  },
-  botaoOpcoes: {
-    marginTop: 8,
   },
 });

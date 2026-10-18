@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Entrega, FormaPagamento, Pagamento } from '../services';
 import { cores } from '../theme/colors';
 import { formatarMoeda } from '../utils/dataHora';
@@ -40,6 +41,7 @@ export function FormaPagamentoModal({
   const [digitosValor, setDigitosValor] = useState('');
   const [pagamentosAdicionados, setPagamentosAdicionados] = useState<Pagamento[]>([]);
   const [tecladoVisivel, setTecladoVisivel] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (entrega) {
@@ -113,9 +115,8 @@ export function FormaPagamentoModal({
     }
   }
 
-  function handleConfirmarEOcultarTeclado() {
+  function handleOcultarTeclado() {
     Keyboard.dismiss();
-    handleConfirmar();
   }
 
   return (
@@ -259,13 +260,12 @@ export function FormaPagamentoModal({
 
           {tecladoVisivel && (
             <Pressable
-              style={[styles.fabConfirmar, !podeConfirmar && styles.fabConfirmarDesabilitado]}
-              onPress={handleConfirmarEOcultarTeclado}
-              disabled={!podeConfirmar}
+              style={[styles.fabConfirmar, { bottom: insets.bottom + 92 }]}
+              onPress={handleOcultarTeclado}
               accessibilityRole="button"
-              accessibilityLabel="Confirmar e ocultar teclado"
+              accessibilityLabel="Ocultar teclado"
             >
-              <Icon name="check" size={26} color={cores.primariaTexto} />
+              <Icon name="keyboard-close" size={26} color={cores.primariaTexto} />
             </Pressable>
           )}
         </>
@@ -447,7 +447,6 @@ const styles = StyleSheet.create({
   fabConfirmar: {
     position: 'absolute',
     right: 4,
-    bottom: 76,
     width: 52,
     height: 52,
     borderRadius: 26,
@@ -459,8 +458,5 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-  },
-  fabConfirmarDesabilitado: {
-    opacity: 0.5,
   },
 });

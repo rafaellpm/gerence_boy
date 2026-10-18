@@ -6,24 +6,18 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AppHeader } from '../../components/AppHeader';
 import { BotaoGrande } from '../../components/BotaoGrande';
 import { CardEntrega } from '../../components/CardEntrega';
-import { FormaPagamentoModal } from '../../components/FormaPagamentoModal';
-import { OpcoesEntregaBottomSheet } from '../../components/OpcoesEntregaBottomSheet';
 import { SairHeaderButton } from '../../components/SairHeaderButton';
 import { ScannerCodigoModal } from '../../components/ScannerCodigoModal';
 import { useEntregadorContext } from '../../contexts/EntregadorContext';
 import { MainTabParamList } from '../../navigation/types';
-import { entregaService, Entrega, Pagamento } from '../../services';
+import { entregaService, Entrega } from '../../services';
 import { cores } from '../../theme/colors';
-import { abrirEntregaNoGoogleMaps } from '../../utils/maps';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Pendentes'>;
 
 export function ListaEntregasScreen({ navigation }: Props) {
-  const { entregador, entregas, recarregarEntregas, confirmarEntregaLocal, focarEntregaNoMapa, moverEntregaNaLista } =
+  const { entregador, entregas, recarregarEntregas, focarEntregaNoMapa, moverEntregaNaLista } =
     useEntregadorContext();
-  const [entregaSelecionada, setEntregaSelecionada] = useState<Entrega | null>(null);
-  const [entregaParaPagamento, setEntregaParaPagamento] = useState<Entrega | null>(null);
-  const [confirmandoPagamento, setConfirmandoPagamento] = useState(false);
   const [scannerAberto, setScannerAberto] = useState(false);
   const [bipando, setBipando] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
@@ -96,12 +90,7 @@ export function ListaEntregasScreen({ navigation }: Props) {
     }
   }
 
-  function fecharOpcoes() {
-    setEntregaSelecionada(null);
-  }
-
-  function handleVerMapaNoApp(entrega: Entrega) {
-    fecharOpcoes();
+  function handleAbrirNoMapa(entrega: Entrega) {
     focarEntregaNoMapa(entrega);
     navigation.navigate('Mapa');
   }
@@ -110,37 +99,6 @@ export function ListaEntregasScreen({ navigation }: Props) {
   function handleVerProximaNoMapa() {
     focarEntregaNoMapa(null);
     navigation.navigate('Mapa');
-  }
-
-  async function handleAbrirGoogleMaps(entrega: Entrega) {
-    fecharOpcoes();
-    try {
-      await abrirEntregaNoGoogleMaps(entrega);
-    } catch {
-      Alert.alert('Não foi possível abrir o Google Maps', 'Verifique se o app está instalado.');
-    }
-  }
-
-  function handleMarcarEntregue(entrega: Entrega) {
-    fecharOpcoes();
-    setEntregaParaPagamento(entrega);
-  }
-
-  async function handleConfirmarPagamento(pagamentos: Pagamento[]) {
-    if (!entregaParaPagamento) {
-      return;
-    }
-
-    setConfirmandoPagamento(true);
-
-    try {
-      await confirmarEntregaLocal(entregaParaPagamento.codigo, entregaParaPagamento.dataVenda, pagamentos);
-      setEntregaParaPagamento(null);
-    } catch {
-      Alert.alert('Erro ao marcar entrega', 'Não foi possível salvar no banco local do dispositivo.');
-    } finally {
-      setConfirmandoPagamento(false);
-    }
   }
 
   return (
@@ -173,7 +131,7 @@ export function ListaEntregasScreen({ navigation }: Props) {
           renderItem={({ item, index }) => (
             <CardEntrega
               entrega={item}
-              onAbrirOpcoes={setEntregaSelecionada}
+              onPress={handleAbrirNoMapa}
               onSubir={index > 0 ? () => moverEntregaNaLista(item.codigo, item.dataVenda, 'cima') : undefined}
               onDescer={
                 index < entregas.length - 1
@@ -196,21 +154,6 @@ export function ListaEntregasScreen({ navigation }: Props) {
             <Icon name="plus" size={28} color={cores.primariaTexto} />
           )}
         </Pressable>
-
-        <OpcoesEntregaBottomSheet
-          entrega={entregaSelecionada}
-          onFechar={fecharOpcoes}
-          onVerMapaNoApp={handleVerMapaNoApp}
-          onAbrirGoogleMaps={handleAbrirGoogleMaps}
-          onMarcarEntregue={handleMarcarEntregue}
-        />
-
-        <FormaPagamentoModal
-          entrega={entregaParaPagamento}
-          onFechar={() => setEntregaParaPagamento(null)}
-          onConfirmar={handleConfirmarPagamento}
-          confirmando={confirmandoPagamento}
-        />
 
         <ScannerCodigoModal
           visible={scannerAberto}
