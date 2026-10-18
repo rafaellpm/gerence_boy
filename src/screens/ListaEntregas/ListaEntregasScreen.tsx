@@ -59,9 +59,9 @@ export function ListaEntregasScreen({ navigation }: Props) {
           await recarregarEntregas();
 
           if (primeiraEntrega) {
-            // Primeira entrega da sessão: já leva direto pro mapa focado nela.
+            // Primeira entrega da sessão: já deixa o mapa focado nela, mas
+            // sem trocar de aba — continua bipando daqui.
             focarEntregaNoMapa(resultado.entrega);
-            navigation.navigate('Mapa');
           } else {
             Alert.alert(
               resultado.status === 'VINCULADO' ? 'Entrega vinculada' : 'Entrega já na lista',

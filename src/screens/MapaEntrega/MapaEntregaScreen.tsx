@@ -11,8 +11,9 @@ import {
   UserLocation,
   type TrackUserLocationChangeEvent,
 } from '@maplibre/maplibre-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeSyntheticEvent } from 'react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,7 +50,7 @@ function coordenadaPropria(entrega: Entrega): Coordenada | null {
 }
 
 export function MapaEntregaScreen(_props: Props) {
-  const { entregas, entregaEmFoco, focarEntregaNoMapa, confirmarEntregaLocal } =
+  const { entregas, entregaEmFoco, focarEntregaNoMapa, confirmarEntregaLocal, recarregarEntregas } =
     useEntregadorContext();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
@@ -74,6 +75,15 @@ export function MapaEntregaScreen(_props: Props) {
   useEffect(() => {
     LocationManager.requestPermissions().then(setPermissaoLocalizacao);
   }, []);
+
+  // Recarrega ao focar a aba "Mapa" — pega tanto entregas bipadas na aba
+  // "Pendentes" enquanto estava em outra tela quanto uma reordenação feita
+  // lá, já que a ordem configurada é o que define a próxima parada aqui.
+  useFocusEffect(
+    useCallback(() => {
+      recarregarEntregas().catch(() => undefined);
+    }, [recarregarEntregas]),
+  );
 
   const entregasPendentes = entregas.filter(
     item => item.situacao === 'PENDENTE' || item.situacao === 'EM_ROTA',
