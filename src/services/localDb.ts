@@ -18,6 +18,7 @@ async function adicionarColunasPagamento(): Promise<void> {
     'ALTER TABLE entregas_bipadas ADD COLUMN entregue_em TEXT',
     'ALTER TABLE entregas_bipadas ADD COLUMN ordem INTEGER',
     'ALTER TABLE entregas_bipadas ADD COLUMN valor_total REAL',
+    'ALTER TABLE entregas_bipadas ADD COLUMN troco_pedido REAL',
   ];
 
   for (const sql of alteracoes) {
@@ -61,6 +62,7 @@ async function migrarChavePrimariaComData(): Promise<void> {
         forma_pagamento TEXT,
         valor REAL,
         valor_total REAL,
+        troco_pedido REAL,
         entregue_em TEXT,
         ordem INTEGER,
         PRIMARY KEY (entregador_codigo, codigo, data_venda)
@@ -69,8 +71,8 @@ async function migrarChavePrimariaComData(): Promise<void> {
 
     await tx.execute(
       `INSERT OR IGNORE INTO entregas_bipadas
-        (entregador_codigo, codigo, data_venda, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, forma_pagamento, valor, valor_total, entregue_em, ordem)
-       SELECT entregador_codigo, codigo, substr(criado_em, 1, 10), numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, forma_pagamento, valor, valor_total, entregue_em, ordem
+        (entregador_codigo, codigo, data_venda, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, forma_pagamento, valor, valor_total, troco_pedido, entregue_em, ordem)
+       SELECT entregador_codigo, codigo, substr(criado_em, 1, 10), numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, forma_pagamento, valor, valor_total, troco_pedido, entregue_em, ordem
        FROM entregas_bipadas_old`,
     );
 
@@ -107,6 +109,7 @@ function garantirTabela(): Promise<void> {
           forma_pagamento TEXT,
           valor REAL,
           valor_total REAL,
+          troco_pedido REAL,
           entregue_em TEXT,
           ordem INTEGER,
           PRIMARY KEY (entregador_codigo, codigo, data_venda)
@@ -225,6 +228,7 @@ function linhaParaEntrega(linha: Record<string, unknown>): Entrega {
     longitude: linha.longitude == null ? undefined : Number(linha.longitude),
     situacao: linha.situacao as SituacaoEntrega,
     valorTotal: linha.valor_total == null ? undefined : Number(linha.valor_total),
+    trocoPedido: linha.troco_pedido == null ? undefined : Number(linha.troco_pedido),
     entregueEm: linha.entregue_em == null ? undefined : String(linha.entregue_em),
   };
 }
@@ -251,8 +255,8 @@ export async function salvarEntregaBipada(
 
     const resultado = await tx.execute(
       `INSERT OR IGNORE INTO entregas_bipadas
-        (entregador_codigo, codigo, data_venda, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, ordem, valor_total)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (entregador_codigo, codigo, data_venda, numero_pedido, cliente, endereco, latitude, longitude, situacao, criado_em, ordem, valor_total, troco_pedido)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         entregadorCodigo,
         entrega.codigo,
@@ -266,19 +270,27 @@ export async function salvarEntregaBipada(
         new Date().toISOString(),
         proximaOrdem,
         entrega.valorTotal ?? null,
+        entrega.trocoPedido ?? null,
       ],
     );
 
     adicionada = resultado.rowsAffected > 0;
 
-    // Entregas bipadas antes do valor_total existir/ser gravado ficam com
-    // essa coluna nula pra sempre, já que o INSERT OR IGNORE não toca em
+    // Entregas bipadas antes de valor_total/troco_pedido existirem ficam com
+    // essas colunas nulas pra sempre, já que o INSERT OR IGNORE não toca em
     // linha existente — preenche retroativamente a cada sincronização.
     if (!adicionada && entrega.valorTotal != null) {
       await tx.execute(
         `UPDATE entregas_bipadas SET valor_total = ?
          WHERE entregador_codigo = ? AND codigo = ? AND data_venda = ? AND valor_total IS NULL`,
         [entrega.valorTotal, entregadorCodigo, entrega.codigo, entrega.dataVenda],
+      );
+    }
+    if (!adicionada && entrega.trocoPedido != null) {
+      await tx.execute(
+        `UPDATE entregas_bipadas SET troco_pedido = ?
+         WHERE entregador_codigo = ? AND codigo = ? AND data_venda = ? AND troco_pedido IS NULL`,
+        [entrega.trocoPedido, entregadorCodigo, entrega.codigo, entrega.dataVenda],
       );
     }
   });

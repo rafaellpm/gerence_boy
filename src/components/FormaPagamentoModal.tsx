@@ -25,11 +25,10 @@ function arredondar(valor: number): number {
 
 /**
  * Confirma a entrega podendo registrar mais de um pagamento pra mesma venda
- * (ex.: parte em dinheiro, parte no cartão) — "+ Adicionar outro pagamento"
- * guarda o forma/valor atual na lista e limpa os campos pro próximo; o
- * "Confirmar entrega" sempre inclui o que estiver preenchido no momento,
- * então um pagamento único continua sendo só selecionar a forma e digitar
- * o valor, sem precisar desse botão extra.
+ * (ex.: parte em dinheiro, parte no cartão). O botão "+" é obrigatório pra
+ * todo pagamento, inclusive o único — ele que registra o valor na lista; o
+ * "Finalizar entrega" só muda a situação da venda e só habilita quando a
+ * soma do que já foi adicionado cobre o valor total.
  */
 export function FormaPagamentoModal({
   entrega,
@@ -88,11 +87,12 @@ export function FormaPagamentoModal({
   const valorAplicado = arredondar(valorAtual - trocoAtual);
 
   const rascunhoValido = !!formaSelecionada && valorAtual > 0 && !excedeLimite;
-  const pagamentosFinais: Pagamento[] = rascunhoValido
-    ? [...pagamentosAdicionados, { formaPagamento: formaSelecionada!, valor: valorAplicado }]
-    : pagamentosAdicionados;
-  const totalFinal = pagamentosFinais.reduce((soma, item) => soma + item.valor, 0);
-  const podeConfirmar = pagamentosFinais.length > 0 && !confirmando;
+
+  // "Finalizar" só habilita com o que já foi registrado pelo "+" — o
+  // rascunho ainda não adicionado não conta, por mais que esteja preenchido.
+  const faltante = valorTotal != null ? arredondar(Math.max(valorTotal - totalAdicionado, 0)) : 0;
+  const cobreValorTotal = valorTotal == null || faltante <= 0.001;
+  const podeConfirmar = pagamentosAdicionados.length > 0 && cobreValorTotal && !confirmando;
 
   function handleAdicionarPagamento() {
     if (!rascunhoValido) {
@@ -108,8 +108,8 @@ export function FormaPagamentoModal({
   }
 
   function handleConfirmar() {
-    if (pagamentosFinais.length > 0) {
-      onConfirmar(pagamentosFinais);
+    if (podeConfirmar) {
+      onConfirmar(pagamentosAdicionados);
     }
   }
 
@@ -134,6 +134,15 @@ export function FormaPagamentoModal({
               </Text>
               <Text style={styles.valorVendaValor}>
                 {formatarMoeda(pagamentosAdicionados.length > 0 ? (restante ?? entrega.valorTotal) : entrega.valorTotal)}
+              </Text>
+            </View>
+          )}
+
+          {entrega.trocoPedido != null && (
+            <View style={styles.trocoPedido}>
+              <Icon name="cash-refund" size={16} color={cores.textoSecundario} />
+              <Text style={styles.trocoPedidoTexto}>
+                Troco: {formatarMoeda(entrega.trocoPedido)}
               </Text>
             </View>
           )}
@@ -213,9 +222,9 @@ export function FormaPagamentoModal({
               disabled={!rascunhoValido || confirmando}
               style={[styles.botaoAdicionar, !rascunhoValido && styles.botaoAdicionarDesabilitado]}
               accessibilityRole="button"
-              accessibilityLabel="Adicionar outro pagamento"
+              accessibilityLabel="Adicionar pagamento"
             >
-              <Icon name="plus" size={22} color={cores.primariaTexto} />
+              <Icon name="plus" size={30} color={cores.primariaTexto} />
             </Pressable>
           </View>
 
@@ -226,15 +235,21 @@ export function FormaPagamentoModal({
           )}
 
           {trocoAtual > 0 && (
-            <Text style={styles.mensagemTroco}>Troco: {formatarMoeda(trocoAtual)}</Text>
+            <Text style={styles.mensagemTroco}>Troco a devolver: {formatarMoeda(trocoAtual)}</Text>
+          )}
+
+          {pagamentosAdicionados.length > 0 && !cobreValorTotal && (
+            <Text style={styles.mensagemErro}>
+              Faltam {formatarMoeda(faltante)} pra completar o valor da entrega.
+            </Text>
           )}
 
           {pagamentosAdicionados.length > 0 && (
-            <Text style={styles.totalGeral}>Total: {formatarMoeda(totalFinal)}</Text>
+            <Text style={styles.totalGeral}>Total: {formatarMoeda(totalAdicionado)}</Text>
           )}
 
           <BotaoGrande
-            titulo="Confirmar entrega"
+            titulo="Finalizar entrega"
             icone="check-circle-outline"
             onPress={handleConfirmar}
             desabilitado={!podeConfirmar}
@@ -290,6 +305,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: cores.sucesso,
+  },
+  trocoPedido: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  trocoPedidoTexto: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: cores.textoSecundario,
   },
   rotulo: {
     fontSize: 13,
@@ -397,9 +424,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   botaoAdicionar: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 16,
     backgroundColor: cores.primaria,
     alignItems: 'center',
     justifyContent: 'center',

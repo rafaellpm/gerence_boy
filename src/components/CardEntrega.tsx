@@ -37,7 +37,7 @@ export function CardEntrega({ entrega, onAbrirOpcoes, onSubir, onDescer }: CardE
           <Text style={styles.cliente}>{entrega.cliente}</Text>
           <Text style={styles.endereco}>{entrega.endereco}</Text>
           {entrega.valorTotal != null && (
-            <Text style={styles.valor}>Cobrar: {formatarMoeda(entrega.valorTotal)}</Text>
+            <Text style={styles.valor}>Valor: {formatarMoeda(entrega.valorTotal)}</Text>
           )}
         </View>
       </View>

@@ -9,7 +9,9 @@ import {
   Marker,
   useCurrentPosition,
   UserLocation,
+  type TrackUserLocationChangeEvent,
 } from '@maplibre/maplibre-react-native';
+import type { NativeSyntheticEvent } from 'react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -62,6 +64,10 @@ export function MapaEntregaScreen(_props: Props) {
   const [mapaPronto, setMapaPronto] = useState(false);
   const [permissaoLocalizacao, setPermissaoLocalizacao] = useState(false);
   const [rotaAtual, setRotaAtual] = useState<GeoJSON.LineString | null>(null);
+  // true quando o entregador arrasta o mapa durante a navegação — a própria
+  // lib já para de seguir nesse caso (igual Google Maps), só falta o botão
+  // de recentralizar pra voltar a seguir.
+  const [seguindoPausado, setSeguindoPausado] = useState(false);
 
   const posicaoAtual = useCurrentPosition();
 
@@ -158,8 +164,19 @@ export function MapaEntregaScreen(_props: Props) {
     }
   }, [pontos.length === 0]);
 
+  // Enquanto não há posição do entregador (sem permissão/sem sinal de GPS
+  // ainda), foca na parada pra não deixar o mapa sem referência — depois que
+  // o GPS responde, é o `trackUserLocation="course"` da Camera que assume e
+  // passa a seguir o entregador, girando o mapa conforme ele anda.
   useEffect(() => {
-    if (!mapaPronto || mostrandoTodas || latitudeAtual == null || longitudeAtual == null) {
+    if (
+      !mapaPronto ||
+      mostrandoTodas ||
+      latitudeEntregador != null ||
+      longitudeEntregador != null ||
+      latitudeAtual == null ||
+      longitudeAtual == null
+    ) {
       return;
     }
     cameraRef.current?.flyTo({
@@ -167,7 +184,29 @@ export function MapaEntregaScreen(_props: Props) {
       zoom: ZOOM_FOCO,
       duration: 700,
     });
-  }, [mapaPronto, mostrandoTodas, latitudeAtual, longitudeAtual]);
+  }, [mapaPronto, mostrandoTodas, latitudeAtual, longitudeAtual, latitudeEntregador, longitudeEntregador]);
+
+  // Modo navegação: segue a posição do entregador e gira o mapa de acordo
+  // com a direção em que ele está andando, igual um app de navegação — só
+  // enquanto estiver com uma entrega em foco (não ao ver todas as paradas) e
+  // enquanto ele não tiver arrastado o mapa manualmente.
+  const emModoNavegacao = permissaoLocalizacao && !mostrandoTodas && !seguindoPausado;
+
+  // Ao avançar pra próxima parada (ex.: depois de confirmar a entrega
+  // anterior) volta a seguir automaticamente, mesmo que tivesse pausado.
+  useEffect(() => {
+    setSeguindoPausado(false);
+  }, [entregaAtual?.id]);
+
+  function handleTrackUserLocationChange(event: NativeSyntheticEvent<TrackUserLocationChangeEvent>) {
+    if (emModoNavegacao && event.nativeEvent.trackUserLocation == null) {
+      setSeguindoPausado(true);
+    }
+  }
+
+  function handleRecentralizar() {
+    setSeguindoPausado(false);
+  }
 
   useEffect(() => {
     if (!mapaPronto || !mostrandoTodas || pontos.length === 0) {
@@ -196,6 +235,7 @@ export function MapaEntregaScreen(_props: Props) {
   function handleFocarProxima() {
     focarEntregaNoMapa(null);
     setMostrandoTodas(false);
+    setSeguindoPausado(false);
   }
 
   async function handleAbrirGoogleMaps() {
@@ -267,7 +307,13 @@ export function MapaEntregaScreen(_props: Props) {
             logo={false}
             onDidFinishLoadingMap={() => setMapaPronto(true)}
           >
-            <Camera ref={cameraRef} initialViewState={{ zoom: ZOOM_FOCO }} />
+            <Camera
+              ref={cameraRef}
+              initialViewState={{ zoom: ZOOM_FOCO }}
+              trackUserLocation={emModoNavegacao ? 'course' : undefined}
+              pitch={emModoNavegacao ? 45 : 0}
+              onTrackUserLocationChange={handleTrackUserLocationChange}
+            />
 
             {permissaoLocalizacao && <UserLocation />}
 
@@ -303,6 +349,17 @@ export function MapaEntregaScreen(_props: Props) {
           <View style={styles.containerVazio}>
             <Text style={styles.textoVazio}>Localizando endereço no mapa…</Text>
           </View>
+        )}
+
+        {seguindoPausado && !mostrandoTodas && (
+          <Pressable
+            style={[styles.botaoRecentralizar, { top: insets.top + 16 }]}
+            onPress={handleRecentralizar}
+            accessibilityRole="button"
+            accessibilityLabel="Recentralizar no entregador"
+          >
+            <Icon name="crosshairs-gps" size={24} color={cores.primariaTexto} />
+          </Pressable>
         )}
 
         <View style={[styles.cartao, { bottom: insets.bottom + 16 }]}>
@@ -398,6 +455,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: cores.textoSecundario,
     textAlign: 'center',
+  },
+  botaoRecentralizar: {
+    position: 'absolute',
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: cores.primaria,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: cores.preto,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   cartao: {
     position: 'absolute',

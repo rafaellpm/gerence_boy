@@ -14,6 +14,7 @@ type VendaEntregadorApi = {
   TP_SITUACAOPEDIDO: string;
   SITUACAO: string;
   VALOR_TOTAL: string;
+  VL_TROCO: string;
   NOME_PESSOA: string;
   ENDERECO: string;
   NR_LOGRADOURO: string;
@@ -31,6 +32,19 @@ function paraNumeroOuUndefined(valor: string | undefined): number | undefined {
   }
   const numero = Number(valor);
   return Number.isFinite(numero) ? numero : undefined;
+}
+
+/**
+ * VL_TROCO também é usado como flag em outras telas do GerencePlus (9999 =
+ * cartão, 9998 = Pix — "sem troco"), não só como valor de troco de verdade.
+ * Só repassa pro app quando é um valor positivo e não é uma dessas flags.
+ */
+function paraTrocoOuUndefined(valor: string | undefined): number | undefined {
+  const numero = paraNumeroOuUndefined(valor);
+  if (numero == null || numero <= 0 || numero === 9999 || numero === 9998) {
+    return undefined;
+  }
+  return numero;
 }
 
 /**
@@ -61,6 +75,7 @@ function mapearVenda(venda: VendaEntregadorApi): Entrega {
     longitude: paraNumeroOuUndefined(venda.DS_LONGITUDE),
     situacao: mapearSituacaoVenda(venda.TP_SITUACAOPEDIDO, venda.SITUACAO),
     valorTotal: paraNumeroOuUndefined(venda.VALOR_TOTAL),
+    trocoPedido: paraTrocoOuUndefined(venda.VL_TROCO),
   };
 }
 
@@ -100,6 +115,7 @@ type VinculoEntregadorApi = {
   DS_LATITUDE?: string;
   DS_LONGITUDE?: string;
   VALOR_TOTAL?: string;
+  VL_TROCO?: string;
   [campo: string]: string | undefined;
 };
 
@@ -120,6 +136,7 @@ function mapearVinculo(venda: VinculoEntregadorApi): Entrega {
     longitude: paraNumeroOuUndefined(venda.DS_LONGITUDE),
     situacao: 'EM_ROTA',
     valorTotal: paraNumeroOuUndefined(venda.VALOR_TOTAL),
+    trocoPedido: paraTrocoOuUndefined(venda.VL_TROCO),
   };
 }
 

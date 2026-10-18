@@ -122,6 +122,9 @@ export function PagamentosScreen(_props: Props) {
                 </Text>
               </View>
               <Text style={styles.cardCliente}>{item.cliente}</Text>
+              {item.valorTotal != null && (
+                <Text style={styles.cardValorVenda}>Valor: {formatarMoeda(item.valorTotal)}</Text>
+              )}
               <View style={styles.cardRodape}>
                 <View style={styles.cardFormas}>
                   {(item.pagamentos ?? []).map((pagamento, indice) => (
@@ -325,6 +328,11 @@ const styles = StyleSheet.create({
   cardCliente: {
     fontSize: 14,
     color: cores.textoSecundario,
+  },
+  cardValorVenda: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: cores.sucesso,
   },
   cardRodape: {
     flexDirection: 'row',
