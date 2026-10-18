@@ -58,11 +58,11 @@ export function ListaEntregasScreen({ navigation }: Props) {
           const primeiraEntrega = entregas.length === 0;
           await recarregarEntregas();
 
-          if (primeiraEntrega) {
-            // Primeira entrega da sessão: já deixa o mapa focado nela, mas
-            // sem trocar de aba — continua bipando daqui.
-            focarEntregaNoMapa(resultado.entrega);
-          } else {
+          // Primeira entrega da sessão: nenhum aviso, ela já aparece no mapa
+          // (é a única, cai como primeira da ordem configurada). Fixar foco
+          // nela aqui travaria o mapa nela pra sempre, ignorando reordenações
+          // futuras — por isso não chama `focarEntregaNoMapa`.
+          if (!primeiraEntrega) {
             Alert.alert(
               resultado.status === 'VINCULADO' ? 'Entrega vinculada' : 'Entrega já na lista',
               `${resultado.entrega.numeroPedido} — ${resultado.entrega.cliente}`,
